@@ -1,10 +1,10 @@
 import express from 'express';
 import cors from 'cors';
-import { initializeFirebaseAdmin } from './utils/firebase';
-import { DatabaseService } from './utils/database';
-import { verifyFirebaseToken, AuthenticatedRequest } from './middleware/auth.middleware';
-import { AuthService } from './services/auth.service';
-import { User } from './models/User.model';
+import { initializeFirebaseAdmin } from './src/utils/firebase';
+import { DatabaseService } from './src/utils/database';
+import { verifyFirebaseToken, AuthenticatedRequest } from './src/middleware/auth.middleware';
+import { AuthService } from './src/services/auth.service';
+import { User } from './src/models/User.model';
 
 // Initialize Firebase Admin
 initializeFirebaseAdmin();
