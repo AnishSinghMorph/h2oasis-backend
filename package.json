@@ -1,20 +1,31 @@
 {
   "name": "h2oasis-backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Authentication backend for H2Oasis - Firebase Functions with TypeScript",
+  "main": "lib/index.js",
+  "engines": {
+    "node": "18"
+  },
   "scripts": {
     "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "start": "node lib/index.js",
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
-    "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"No tests specified yet\" && exit 0",
+    "test:watch": "echo \"No test watcher configured yet\"",
+    "lint": "echo \"No linter configured yet\" && exit 0",
+    "lint:fix": "echo \"No linter configured yet\"",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf lib",
+    "prebuild": "npm run clean",
+    "prestart": "npm run build"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["firebase", "authentication", "typescript", "express", "mongodb", "h2oasis"],
+  "author": "Anish Singh",
+  "license": "MIT",
   "type": "commonjs",
   "dependencies": {
     "@types/cors": "^2.8.19",

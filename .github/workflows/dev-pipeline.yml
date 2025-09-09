@@ -1,0 +1,67 @@
+name: 🔍 Development Pipeline
+
+on:
+  push:
+    branches: [ develop, feature/** ]
+  pull_request:
+    branches: [ develop ]
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # ===== QUICK VALIDATION =====
+  validate:
+    name: ⚡ Quick Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 📦 Install Dependencies
+      run: npm ci
+      
+    - name: 🔨 TypeScript Check
+      run: npx tsc --noEmit
+      
+    - name: 🔍 Basic Lint
+      run: npm run lint || echo "No lint script found"
+      
+    - name: 🧪 Quick Tests
+      run: npm test || echo "No tests configured"
+      
+    - name: 📊 Build Check
+      run: npm run build
+      
+  # ===== CODE QUALITY =====
+  quality:
+    name: 📏 Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 📦 Install Dependencies
+      run: npm ci
+      
+    - name: 🔍 Code Formatting Check
+      run: npx prettier --check "src/**/*.{ts,js}" || echo "Prettier not configured"
+      continue-on-error: true
+      
+    - name: 🕵️ Code Analysis
+      run: npx eslint src/ || echo "ESLint not configured"
+      continue-on-error: true

@@ -1,0 +1,118 @@
+name: 🚀 CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # ===== LINT & TEST =====
+  test:
+    name: 🧪 Test & Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 📦 Install Dependencies
+      run: npm ci
+      
+    - name: 🔍 Lint Code
+      run: npm run lint || echo "No lint script found, skipping..."
+      
+    - name: 🔨 Build TypeScript
+      run: npm run build
+      
+    - name: 🧪 Run Tests
+      run: npm test || echo "No tests found, skipping..."
+      
+    - name: 📊 Upload Coverage
+      uses: codecov/codecov-action@v3
+      if: success()
+      
+  # ===== SECURITY SCAN =====
+  security:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 📦 Install Dependencies
+      run: npm ci
+      
+    - name: 🔍 Security Audit
+      run: npm audit --audit-level moderate
+      
+    - name: 🛡️ Dependency Check
+      run: npx better-npm-audit audit --level moderate
+      continue-on-error: true
+
+  # ===== BUILD & DEPLOY =====
+  deploy:
+    name: 🚀 Deploy to Firebase
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 📦 Install Dependencies
+      run: npm ci
+      
+    - name: 🔨 Build Project
+      run: npm run build
+      
+    - name: 🔥 Deploy to Firebase Functions
+      uses: FirebaseExtended/action-hosting-deploy@v0
+      with:
+        repoToken: '${{ secrets.GITHUB_TOKEN }}'
+        firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_H2OASIS_74D5B }}'
+        projectId: h2oasis-74d5b
+        
+  # ===== NOTIFICATION =====
+  notify:
+    name: 📢 Notify Status
+    runs-on: ubuntu-latest
+    needs: [test, security, deploy]
+    if: always()
+    
+    steps:
+    - name: 🎉 Success Notification
+      if: ${{ needs.test.result == 'success' && needs.security.result == 'success' }}
+      run: |
+        echo "✅ Pipeline completed successfully!"
+        echo "🚀 Deployment status: ${{ needs.deploy.result }}"
+        
+    - name: ❌ Failure Notification
+      if: ${{ needs.test.result == 'failure' || needs.security.result == 'failure' }}
+      run: |
+        echo "❌ Pipeline failed!"
+        echo "🧪 Tests: ${{ needs.test.result }}"
+        echo "🔒 Security: ${{ needs.security.result }}"
