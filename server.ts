@@ -15,7 +15,13 @@ const port = process.env.PORT || 3000;
 
 // CORS configuration
 const corsOptions = {
-  origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:19006'],
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:8081', 
+    'http://localhost:19006',
+    'http://192.168.1.55:8081',
+    'exp://192.168.1.55:8081'
+  ],
   credentials: true,
   optionsSuccessStatus: 200
 };
@@ -91,13 +97,13 @@ app.get('/test/database', async (req, res) => {
 // Registration endpoint
 app.post('/api/auth/register', async (req: Request, res: Response) => {
   try {
-    const { firstName, lastName, email, password } = req.body;
+    const { fullName, email, password } = req.body;
 
     // Validate input
-    if (!firstName || !lastName || !email || !password) {
+    if (!fullName || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'First name, last name, email, and password are required'
+        message: 'Full name, email, and password are required'
       });
     }
 
@@ -112,7 +118,7 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
     const firebaseUser = await admin.auth().createUser({
       email,
       password,
-      displayName: `${firstName} ${lastName}`,
+      displayName: fullName,
     });
 
     // Connect to database
@@ -122,9 +128,8 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
     const userData = {
       firebaseUid: firebaseUser.uid,
       email,
-      firstName,
-      lastName,
-      displayName: `${firstName} ${lastName}`,
+      fullName,
+      displayName: fullName,
       provider: 'password',
     };
 
@@ -136,8 +141,7 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
       user: {
         id: user._id,
         email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        fullName: user.fullName,
         displayName: user.displayName,
       }
     });
@@ -180,12 +184,37 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       });
     }
 
-    // Note: In a real app, you'd typically handle login on the client side with Firebase SDK
-    // This endpoint is mainly for server-side validation or custom token creation
+    // Connect to database
+    await DatabaseService.connect();
+
+    // Find user in our database
+    const user = await User.findOne({ email: email.toLowerCase() });
     
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    // For this demo, we'll create a custom token for the user
+    // In production, you'd verify the password with Firebase Auth on client side
+    const customToken = await admin.auth().createCustomToken(user.firebaseUid);
+
+    // Update last login
+    user.lastLoginAt = new Date();
+    await user.save();
+
     return res.status(200).json({
       success: true,
-      message: 'Login endpoint available - use Firebase SDK on client side for authentication'
+      message: 'Login successful',
+      token: customToken,
+      user: {
+        id: user._id,
+        email: user.email,
+        fullName: user.fullName,
+        displayName: user.displayName,
+      }
     });
 
   } catch (error) {
@@ -216,8 +245,7 @@ app.get('/api/auth/profile', verifyFirebaseToken, async (req: any, res: Response
       user: {
         id: user._id,
         email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        fullName: user.fullName,
         displayName: user.displayName,
         isEmailVerified: user.isEmailVerified,
         profileCompleted: user.profileCompleted,

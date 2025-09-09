@@ -4,8 +4,7 @@ import { admin } from '../utils/firebase';
 export interface CreateUserData {
   firebaseUid: string;
   email: string;
-  firstName?: string;
-  lastName?: string;
+  fullName?: string;
   phone?: string;
   displayName?: string;
   photoURL?: string;

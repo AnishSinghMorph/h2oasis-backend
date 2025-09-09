@@ -4,8 +4,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IUser extends Document {
   firebaseUid: string;
   email: string;
-  firstName?: string;
-  lastName?: string;
+  fullName?: string;
   phone?: string; // For phone/email login option
   displayName?: string;
   photoURL?: string;
@@ -34,15 +33,10 @@ const UserSchema = new Schema<IUser>({
     lowercase: true,
     match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
   },
-  firstName: {
+  fullName: {
     type: String,
     trim: true,
-    maxlength: [30, 'First name cannot exceed 30 characters']
-  },
-  lastName: {
-    type: String,
-    trim: true,
-    maxlength: [30, 'Last name cannot exceed 30 characters']
+    maxlength: [60, 'Full name cannot exceed 60 characters']
   },
   phone: {
     type: String,
@@ -105,10 +99,7 @@ UserSchema.index({ isActive: 1 });
 
 // Virtual for full name display
 UserSchema.virtual('fullDisplayName').get(function() {
-  if (this.firstName && this.lastName) {
-    return `${this.firstName} ${this.lastName}`;
-  }
-  return this.displayName || this.email.split('@')[0];
+  return this.fullName || this.displayName || this.email.split('@')[0];
 });
 
 // Pre-save middleware to set profileCompleted status
