@@ -90,11 +90,14 @@ jobs:
       run: npm run build
       
     - name: 🔥 Deploy to Firebase Functions
-      uses: FirebaseExtended/action-hosting-deploy@v0
-      with:
-        repoToken: '${{ secrets.GITHUB_TOKEN }}'
-        firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_H2OASIS_74D5B }}'
-        projectId: h2oasis-74d5b
+      env:
+        FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_H2OASIS_74D5B }}
+      run: |
+        npm install -g firebase-tools
+        echo "$FIREBASE_SERVICE_ACCOUNT" > firebase-service-account.json
+        export GOOGLE_APPLICATION_CREDENTIALS=firebase-service-account.json
+        firebase deploy --only functions --project h2oasis-74d5b --non-interactive
+        rm firebase-service-account.json
         
   # ===== NOTIFICATION =====
   notify:
