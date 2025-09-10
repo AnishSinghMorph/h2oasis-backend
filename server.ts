@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import { initializeFirebaseAdmin } from './src/utils/firebase';
 import { logger, errorHandler, notFound } from './src/middleware/essential.middleware';
+import { DatabaseService } from './src/utils/database';
+import { Product } from './src/models/Product.model';
 import authRoutes from './src/routes/auth.routes';
 import healthRoutes from './src/routes/health.routes';
 import productRoutes from './src/routes/product.routes';
@@ -40,8 +42,28 @@ app.use(notFound);        // Handle 404s
 app.use(errorHandler);    // Handle all errors
 
 // Start server
-app.listen(port, () => {
+app.listen(port, async () => {
   console.log(`Server running on http://localhost:${port}`);
   console.log(`Health check: http://localhost:${port}/health`);
   console.log(`Database test: http://localhost:${port}/health/database`);
+  
+  // Auto-seed products on server start (like Django fixtures)
+  try {
+    await DatabaseService.connect();
+    const existingProducts = await Product.countDocuments();
+    
+    if (existingProducts === 0) {
+      console.log('🌱 No products found, seeding default products...');
+      await Product.insertMany([
+        { name: 'Cold Plunge', type: 'cold-plunge' },
+        { name: 'Hot Tub', type: 'hot-tub' },
+        { name: 'Sauna', type: 'sauna' }
+      ]);
+      console.log('✅ Products seeded successfully! (3 products created)');
+    } else {
+      console.log(`📦 Products already exist (${existingProducts} products found)`);
+    }
+  } catch (error) {
+    console.error('❌ Error seeding products:', error);
+  }
 });

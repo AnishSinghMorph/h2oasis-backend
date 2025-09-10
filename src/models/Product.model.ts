@@ -4,7 +4,6 @@ import mongoose from 'mongoose';
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   type: { type: String, enum: ['cold-plunge', 'hot-tub', 'sauna'], required: true },
-  image: { type: String, required: true },
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 

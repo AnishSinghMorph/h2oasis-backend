@@ -15,6 +15,7 @@ export interface IUser extends Document {
   updatedAt: Date;
   lastLoginAt: Date;
   isActive: boolean;
+  onboardingCompleted: boolean;
   profileCompleted: boolean; // Track if user completed profile setup
 }
 
@@ -81,6 +82,7 @@ const UserSchema = new Schema<IUser>({
     type: Boolean,
     default: true
   },
+  onboardingCompleted: { type: Boolean, default: false },
   profileCompleted: {
     type: Boolean,
     default: false
