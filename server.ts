@@ -12,7 +12,7 @@ import productRoutes from './src/routes/product.routes';
 initializeFirebaseAdmin();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = Number(process.env.PORT) || 3000;
 
 // CORS configuration
 const corsOptions = {
@@ -20,8 +20,10 @@ const corsOptions = {
     'http://localhost:3000',
     'http://localhost:8081', 
     'http://localhost:19006',
-    'http://192.168.1.55:8081',
-    'exp://192.168.1.55:8081'
+    'http://192.168.1.76:8081',
+    'http://192.168.1.76:19006',
+    'exp://192.168.1.76:8081',
+    'exp://192.168.1.76:19006'
   ],
   credentials: true,
   optionsSuccessStatus: 200
@@ -42,8 +44,9 @@ app.use(notFound);        // Handle 404s
 app.use(errorHandler);    // Handle all errors
 
 // Start server
-app.listen(port, async () => {
+app.listen(port, '0.0.0.0', async () => {
   console.log(`Server running on http://localhost:${port}`);
+  console.log(`Network access: http://192.168.1.76:${port}`);
   console.log(`Health check: http://localhost:${port}/health`);
   console.log(`Database test: http://localhost:${port}/health/database`);
   
