@@ -6,7 +6,8 @@ import { asyncHandler } from '../middleware/essential.middleware';
 const router = Router();
 
 router.get('/', asyncHandler(ProductController.getAllProducts));
-router.post('/seed', asyncHandler(ProductController.seedProducts));
+router.get('/my-selection', verifyFirebaseToken, asyncHandler(ProductController.getUserSelection));
 router.post('/select', verifyFirebaseToken, asyncHandler(ProductController.selectProduct));
+router.delete('/unselect', verifyFirebaseToken, asyncHandler(ProductController.unselectProduct));
 
 export default router;

@@ -92,7 +92,7 @@ export class AuthController {
       success: true,
       message: 'Login successful',
       customToken: customToken,
-      firebaseUid: user.firebaseUid,
+      firebaseUID: user.firebaseUid, // Use consistent naming
       user: {
         id: user._id,
         email: user.email,
@@ -123,6 +123,35 @@ export class AuthController {
         displayName: user.displayName,
         isEmailVerified: user.isEmailVerified,
         profileCompleted: user.profileCompleted,
+        onboardingCompleted: user.onboardingCompleted,
+      }
+    });
+  }
+
+  static async completeOnboarding(req: AuthenticatedRequest, res: Response) {
+    const userId = req.user!.uid;
+
+    await DatabaseService.connect();
+    
+    const user = await User.findOneAndUpdate(
+      { firebaseUid: userId }, 
+      { onboardingCompleted: true },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Onboarding completed successfully',
+      user: {
+        id: user._id,
+        onboardingCompleted: user.onboardingCompleted,
       }
     });
   }

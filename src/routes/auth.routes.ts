@@ -14,4 +14,7 @@ router.post('/login', asyncHandler(AuthController.login));
 // Protected profile endpoint
 router.get('/profile', verifyFirebaseToken, asyncHandler(AuthController.getProfile));
 
+// Complete onboarding endpoint
+router.post('/complete-onboarding', verifyFirebaseToken, asyncHandler(AuthController.completeOnboarding));
+
 export default router;
