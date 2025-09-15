@@ -1,95 +1,92 @@
-name: 🚀 CI/CD Pipeline
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ '*' ]  # Run on all branches
   pull_request:
-    branches: [ main ]
-
-env:
-  NODE_VERSION: '18'
+    branches: [ main, develop ]  # PRs to main or develop
 
 jobs:
   # ===== LINT & TEST =====
   test:
-    name: 🧪 Test & Lint
+    name: Test & Lint
     runs-on: ubuntu-latest
     
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: 🟢 Setup Node.js
+    - name: Setup Node.js from .nvmrc
       uses: actions/setup-node@v4
       with:
-        node-version: ${{ env.NODE_VERSION }}
+        node-version-file: '.nvmrc'
         cache: 'npm'
         
-    - name: 📦 Install Dependencies
+    - name: Install Dependencies
       run: npm ci
       
-    - name: 🔍 Lint Code
+    - name: Lint Code
       run: npm run lint || echo "No lint script found, skipping..."
       
-    - name: 🔨 Build TypeScript
+    - name: Build TypeScript
       run: npm run build
       
-    - name: 🧪 Run Tests
+    - name: Run Tests
       run: npm test || echo "No tests found, skipping..."
       
-    - name: 📊 Upload Coverage
+    - name: Upload Coverage
       uses: codecov/codecov-action@v3
       if: success()
       
   # ===== SECURITY SCAN =====
   security:
-    name: 🔒 Security Scan
+    name: Security Scan
     runs-on: ubuntu-latest
     
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: 🟢 Setup Node.js
+    - name: Setup Node.js from .nvmrc
       uses: actions/setup-node@v4
       with:
-        node-version: ${{ env.NODE_VERSION }}
+        node-version-file: '.nvmrc'
         cache: 'npm'
         
-    - name: 📦 Install Dependencies
+    - name: Install Dependencies
       run: npm ci
       
-    - name: 🔍 Security Audit
+    - name: Security Audit
       run: npm audit --audit-level moderate
       
-    - name: 🛡️ Dependency Check
+    - name: Dependency Check
       run: npx better-npm-audit audit --level moderate
       continue-on-error: true
 
   # ===== BUILD & DEPLOY =====
   deploy:
-    name: 🚀 Deploy to Firebase
+    name: Deploy to Firebase
     runs-on: ubuntu-latest
     needs: [test, security]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: 🟢 Setup Node.js
+    - name: Setup Node.js from .nvmrc
       uses: actions/setup-node@v4
       with:
-        node-version: ${{ env.NODE_VERSION }}
+        node-version-file: '.nvmrc'
         cache: 'npm'
         
-    - name: 📦 Install Dependencies
+    - name: Install Dependencies
       run: npm ci
       
-    - name: 🔨 Build Project
+    - name: Build Project
       run: npm run build
       
-    - name: 🔥 Deploy to Firebase Functions
+    - name: Deploy to Firebase Functions
       env:
         FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_H2OASIS_74D5B }}
       run: |
@@ -101,21 +98,21 @@ jobs:
         
   # ===== NOTIFICATION =====
   notify:
-    name: 📢 Notify Status
+    name: Notify Status
     runs-on: ubuntu-latest
     needs: [test, security, deploy]
     if: always()
     
     steps:
-    - name: 🎉 Success Notification
+    - name: Success Notification
       if: ${{ needs.test.result == 'success' && needs.security.result == 'success' }}
       run: |
-        echo "✅ Pipeline completed successfully!"
-        echo "🚀 Deployment status: ${{ needs.deploy.result }}"
+        echo "Pipeline completed successfully!"
+        echo "Deployment status: ${{ needs.deploy.result }}"
         
-    - name: ❌ Failure Notification
+    - name: Failure Notification
       if: ${{ needs.test.result == 'failure' || needs.security.result == 'failure' }}
       run: |
-        echo "❌ Pipeline failed!"
-        echo "🧪 Tests: ${{ needs.test.result }}"
-        echo "🔒 Security: ${{ needs.security.result }}"
+        echo "Pipeline failed!"
+        echo "Tests: ${{ needs.test.result }}"
+        echo "Security: ${{ needs.security.result }}"
