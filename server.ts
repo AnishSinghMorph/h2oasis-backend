@@ -9,6 +9,7 @@ import healthRoutes from './src/routes/health.routes';
 import productRoutes from './src/routes/product.routes';
 import chatRoutes from './src/routes/chat.routes';
 import ttsRoutes from './src/routes/tts.routes';
+import sttRoutes from './src/routes/stt.routes';
 
 // Initialize Firebase Admin
 initializeFirebaseAdmin();
@@ -42,6 +43,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/tts', ttsRoutes);
+app.use('/api/stt', sttRoutes);
 
 // ERROR HANDLING (Must be at the end)
 app.use(notFound);        // Handle 404s
