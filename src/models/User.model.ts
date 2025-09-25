@@ -1,5 +1,16 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
+// Wearable connection interface
+export interface IWearableConnection {
+  id: string;
+  name: string;
+  dataSource: string;
+  connected: boolean;
+  lastSync?: Date;
+  connectedAt?: Date;
+  healthData?: any; // Store actual health data from the wearable
+}
+
 // User interface for TypeScript
 export interface IUser extends Document {
   firebaseUid: string;
@@ -17,6 +28,7 @@ export interface IUser extends Document {
   isActive: boolean;
   onboardingCompleted: boolean;
   profileCompleted: boolean; // Track if user completed profile setup
+  wearableConnections?: Record<string, IWearableConnection>; // Wearable connection status
 }
 
 // MongoDB schema definition
@@ -86,6 +98,10 @@ const UserSchema = new Schema<IUser>({
   profileCompleted: {
     type: Boolean,
     default: false
+  },
+  wearableConnections: {
+    type: Schema.Types.Mixed,
+    default: {}
   }
 }, {
   timestamps: true, // Adds createdAt and updatedAt automatically
