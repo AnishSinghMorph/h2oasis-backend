@@ -49,7 +49,31 @@ app.use('/api/tts', ttsRoutes);
 app.use('/api/stt', sttRoutes);
 app.use('/api/health-data', healthDataRoutes);
 
-
+// ROOK OAuth callback route (for wearable connections)
+app.get('/oauth/wearable/callback/client_uuid/:clientUuid/user_id/:userId', (req, res) => {
+  const { clientUuid, userId } = req.params;
+  console.log(`✅ ROOK OAuth callback received for user ${userId} with client ${clientUuid}`);
+  
+  // Since we use polling method, just return a success page
+  res.send(`
+    <html>
+      <head><title>H2Oasis - Connection Successful</title></head>
+      <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+        <h1>🎉 Wearable Connected Successfully!</h1>
+        <p>Your wearable device has been connected to H2Oasis.</p>
+        <p>You can now close this page and return to the app.</p>
+        <script>
+          // Auto-close after 3 seconds if this is a popup/new tab
+          setTimeout(() => {
+            if (window.opener || window.history.length <= 1) {
+              window.close();
+            }
+          }, 3000);
+        </script>
+      </body>
+    </html>
+  `);
+});
 
 // ERROR HANDLING (Must be at the end)
 app.use(notFound);        // Handle 404s
