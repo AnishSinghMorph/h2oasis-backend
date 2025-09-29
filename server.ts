@@ -11,6 +11,7 @@ import chatRoutes from './src/routes/chat.routes';
 import ttsRoutes from './src/routes/tts.routes';
 import sttRoutes from './src/routes/stt.routes';
 import healthDataRoutes from './src/routes/healthData.routes';
+import elevenlabsRoutes from "./src/routes/elevenLabs.routes"
 
 
 
@@ -48,6 +49,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/tts', ttsRoutes);
 app.use('/api/stt', sttRoutes);
 app.use('/api/health-data', healthDataRoutes);
+app.use('/api/elevenlabs', elevenlabsRoutes);
 
 // ROOK OAuth callback route (for wearable connections)
 app.get('/oauth/wearable/callback/client_uuid/:clientUuid/user_id/:userId', (req, res) => {
@@ -75,9 +77,9 @@ app.get('/oauth/wearable/callback/client_uuid/:clientUuid/user_id/:userId', (req
   `);
 });
 
-// ERROR HANDLING (Must be at the end)
-app.use(notFound);        // Handle 404s
-app.use(errorHandler);    // Handle all errors
+
+app.use(notFound);       
+app.use(errorHandler);   
 
 // Start server
 app.listen(port, '0.0.0.0', async () => {
