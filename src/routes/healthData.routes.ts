@@ -3,7 +3,9 @@ import {
   getUnifiedHealthData, 
   updateHealthDataPreferences,
   updateWearableConnection,
-  getWearableConnections
+  getWearableConnections,
+  syncRookConnections,
+  fetchRookHealthData
 } from '../controllers/healthData.controller';
 
 const router = Router();
@@ -41,5 +43,17 @@ router.post('/wearable-connection', updateWearableConnection);
  * Get all wearable connection statuses for user
  */
 router.get('/wearable-connections', getWearableConnections);
+
+/**
+ * POST /api/health-data/sync-rook
+ * Sync wearable connections from ROOK API to our database
+ */
+router.post('/sync-rook', syncRookConnections);
+
+/**
+ * POST /api/health-data/fetch-rook-data
+ * Fetch health data from ROOK for a specific data source
+ */
+router.post('/fetch-rook-data', fetchRookHealthData);
 
 export default router;

@@ -41,6 +41,7 @@
     "@types/multer": "^2.0.0",
     "@types/node-fetch": "^2.6.13",
     "@types/uuid": "^10.0.0",
+    "axios": "^1.12.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",

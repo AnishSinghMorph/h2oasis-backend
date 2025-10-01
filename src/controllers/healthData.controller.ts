@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { User } from '../models/User.model';
 import { UserSelection } from '../models/UserSelection.model';
 import { Product } from '../models/Product.model';
+import { getUserConnections, getAllHealthDataForSource } from '../services/rook.service';
 
 interface WearableData {
   id: string;
@@ -33,6 +34,7 @@ interface UnifiedHealthData {
   } | null;
   wearables: {
     apple: WearableData;
+    samsung: WearableData;
     garmin: WearableData;
     fitbit: WearableData;
     whoop: WearableData;
@@ -89,6 +91,14 @@ export const getUnifiedHealthData = async (req: Request, res: Response): Promise
           connected: wearableConnections.apple?.connected || false,
           lastSync: wearableConnections.apple?.lastSync?.toISOString(),
           data: wearableConnections.apple?.healthData || null
+        },
+        samsung: {
+          id: 'samsung',
+          name: 'Samsung Health',
+          type: 'sdk',
+          connected: wearableConnections.samsung?.connected || false,
+          lastSync: wearableConnections.samsung?.lastSync?.toISOString(),
+          data: wearableConnections.samsung?.healthData || null
         },
         garmin: {
           id: 'garmin',
@@ -288,6 +298,186 @@ export const getWearableConnections = async (req: Request, res: Response): Promi
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch wearable connections' 
+    });
+  }
+};
+
+export const syncRookConnections = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.headers['x-firebase-uid'] as string;
+    const { mongoUserId } = req.body; // The MongoDB user ID used in ROOK
+    
+    if (!userId) {
+      res.status(401).json({ 
+        success: false, 
+        error: 'Authentication required' 
+      });
+      return;
+    }
+
+    console.log(`🔄 Syncing ROOK connections for user: ${userId}, ROOK User ID: ${mongoUserId}`);
+
+    // Fetch connections from ROOK API
+    const rookConnections = await getUserConnections(mongoUserId);
+    
+    console.log('📡 ROOK API response:', JSON.stringify(rookConnections, null, 2));
+
+    // Map ROOK data sources to our wearable names
+    const dataSourceMap: { [key: string]: string } = {
+      'oura': 'oura',
+      'garmin': 'garmin',
+      'fitbit': 'fitbit',
+      'whoop': 'whoop',
+      'apple_health': 'apple',
+    };
+
+    // Update our database with ROOK connection statuses
+    const user = await User.findOne({ firebaseUid: userId });
+    
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+      return;
+    }
+
+    // Update each wearable connection status
+    for (const [rookSource, ourWearable] of Object.entries(dataSourceMap)) {
+      const rookConnection = rookConnections.connections?.[rookSource];
+      
+      if (rookConnection) {
+        const updateField = `wearableConnections.${ourWearable}`;
+        
+        await User.findOneAndUpdate(
+          { firebaseUid: userId },
+          {
+            $set: {
+              [updateField]: {
+                id: ourWearable,
+                name: ourWearable.charAt(0).toUpperCase() + ourWearable.slice(1),
+                dataSource: rookSource,
+                connected: rookConnection.connected,
+                lastSync: rookConnection.lastSync || new Date(),
+                connectedAt: rookConnection.connected ? new Date() : null,
+              },
+              updatedAt: new Date(),
+            }
+          },
+          { new: true }
+        );
+
+        console.log(`✅ Updated ${ourWearable} connection status: ${rookConnection.connected}`);
+
+        // If connected, try to fetch recent health data
+        if (rookConnection.connected) {
+          try {
+            const healthData = await getAllHealthDataForSource(mongoUserId, rookSource);
+            
+            // Update health data if available
+            await User.findOneAndUpdate(
+              { firebaseUid: userId },
+              {
+                $set: {
+                  [`wearableConnections.${ourWearable}.healthData`]: {
+                    ...healthData,
+                    lastFetched: new Date(),
+                  }
+                }
+              }
+            );
+            
+            console.log(`✅ Fetched and stored health data for ${ourWearable}`);
+          } catch (error) {
+            console.log(`⚠️ Could not fetch health data for ${ourWearable}:`, error);
+          }
+        }
+      }
+    }
+
+    console.log('✅ ROOK connections synced successfully');
+
+    res.json({
+      success: true,
+      message: 'ROOK connections synced successfully',
+      data: rookConnections,
+    });
+
+  } catch (error: any) {
+    console.error('❌ Error syncing ROOK connections:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Failed to sync ROOK connections' 
+    });
+  }
+};
+
+export const fetchRookHealthData = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.headers['x-firebase-uid'] as string;
+    const { mongoUserId, dataSource, date } = req.body;
+    
+    if (!userId) {
+      res.status(401).json({ 
+        success: false, 
+        error: 'Authentication required' 
+      });
+      return;
+    }
+
+    if (!mongoUserId || !dataSource) {
+      res.status(400).json({
+        success: false,
+        error: 'mongoUserId and dataSource are required'
+      });
+      return;
+    }
+
+    console.log(`📊 Fetching ROOK health data for ${dataSource}...`);
+
+    // Fetch all health data from ROOK
+    const healthData = await getAllHealthDataForSource(mongoUserId, dataSource, date);
+
+    // Update user's wearable health data in database
+    const wearableMap: { [key: string]: string } = {
+      'oura': 'oura',
+      'garmin': 'garmin',
+      'fitbit': 'fitbit',
+      'whoop': 'whoop',
+      'apple_health': 'apple',
+    };
+
+    const ourWearable = wearableMap[dataSource];
+    
+    if (ourWearable) {
+      await User.findOneAndUpdate(
+        { firebaseUid: userId },
+        {
+          $set: {
+            [`wearableConnections.${ourWearable}.healthData`]: {
+              ...healthData,
+              lastFetched: new Date(),
+            },
+            updatedAt: new Date(),
+          }
+        },
+        { new: true }
+      );
+      
+      console.log(`✅ Health data stored for ${ourWearable}`);
+    }
+
+    res.json({
+      success: true,
+      message: `Health data fetched successfully from ${dataSource}`,
+      data: healthData,
+    });
+
+  } catch (error: any) {
+    console.error('❌ Error fetching ROOK health data:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Failed to fetch health data' 
     });
   }
 };
