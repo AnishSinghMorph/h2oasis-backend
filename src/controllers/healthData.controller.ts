@@ -19,6 +19,61 @@ interface WearableData {
   };
 }
 
+// Helper function to transform raw ROOK data into clean summary
+const transformHealthData = (healthData: any) => {
+  if (!healthData) return null;
+
+  const result: any = {};
+
+  // Transform sleep data
+  if (healthData.sleep?.sleep_health?.summary?.sleep_summary) {
+    const sleepSummary = healthData.sleep.sleep_health.summary.sleep_summary;
+    result.sleep = {
+      date: sleepSummary.duration?.sleep_date_string,
+      durationHours: sleepSummary.duration?.sleep_duration_seconds_int 
+        ? Math.round(sleepSummary.duration.sleep_duration_seconds_int / 3600) 
+        : null,
+      efficiency: sleepSummary.scores?.sleep_efficiency_1_100_score_int,
+      qualityScore: sleepSummary.scores?.sleep_quality_rating_1_5_score_int,
+      heartRate: {
+        max: sleepSummary.heart_rate?.hr_maximum_bpm_int,
+        min: sleepSummary.heart_rate?.hr_minimum_bpm_int,
+        avg: sleepSummary.heart_rate?.hr_avg_bpm_int
+      }
+    };
+  }
+
+  // Transform physical/activity data
+  if (healthData.physical?.physical_health?.summary?.physical_summary) {
+    const physicalSummary = healthData.physical.physical_health.summary.physical_summary;
+    // Get the most recent activity data (last item in non_structured_data array)
+    const activityData = physicalSummary.non_structured_data?.[physicalSummary.non_structured_data.length - 1];
+    
+    if (activityData) {
+      result.activity = {
+        date: activityData.timestamp,
+        steps: activityData.steps,
+        calories: activityData.total_calories,
+        activityScore: activityData.score
+      };
+    }
+  }
+
+  // Transform body data
+  if (healthData.body?.body_health?.summary?.body_summary) {
+    const bodySummary = healthData.body.body_health.summary.body_summary;
+    result.body = {
+      weight_kg: bodySummary.body_metrics?.weight_kg_float,
+      height_cm: bodySummary.body_metrics?.height_cm_int,
+      bmi: bodySummary.body_metrics?.bmi_float
+    };
+  }
+
+  result.lastFetched = healthData.lastFetched;
+  
+  return result;
+};
+
 interface UnifiedHealthData {
   userId: string;
   profile: {
@@ -90,7 +145,7 @@ export const getUnifiedHealthData = async (req: Request, res: Response): Promise
           type: 'sdk',
           connected: wearableConnections.apple?.connected || false,
           lastSync: wearableConnections.apple?.lastSync?.toISOString(),
-          data: wearableConnections.apple?.healthData || null
+          data: transformHealthData(wearableConnections.apple?.healthData)
         },
         samsung: {
           id: 'samsung',
@@ -98,7 +153,7 @@ export const getUnifiedHealthData = async (req: Request, res: Response): Promise
           type: 'sdk',
           connected: wearableConnections.samsung?.connected || false,
           lastSync: wearableConnections.samsung?.lastSync?.toISOString(),
-          data: wearableConnections.samsung?.healthData || null
+          data: transformHealthData(wearableConnections.samsung?.healthData)
         },
         garmin: {
           id: 'garmin',
@@ -106,7 +161,7 @@ export const getUnifiedHealthData = async (req: Request, res: Response): Promise
           type: 'api',
           connected: wearableConnections.garmin?.connected || false,
           lastSync: wearableConnections.garmin?.lastSync?.toISOString(),
-          data: wearableConnections.garmin?.healthData || null
+          data: transformHealthData(wearableConnections.garmin?.healthData)
         },
         fitbit: {
           id: 'fitbit',
@@ -114,7 +169,7 @@ export const getUnifiedHealthData = async (req: Request, res: Response): Promise
           type: 'api',
           connected: wearableConnections.fitbit?.connected || false,
           lastSync: wearableConnections.fitbit?.lastSync?.toISOString(),
-          data: wearableConnections.fitbit?.healthData || null
+          data: transformHealthData(wearableConnections.fitbit?.healthData)
         },
         whoop: {
           id: 'whoop',
@@ -122,7 +177,7 @@ export const getUnifiedHealthData = async (req: Request, res: Response): Promise
           type: 'api',
           connected: wearableConnections.whoop?.connected || false,
           lastSync: wearableConnections.whoop?.lastSync?.toISOString(),
-          data: wearableConnections.whoop?.healthData || null
+          data: transformHealthData(wearableConnections.whoop?.healthData)
         },
         oura: {
           id: 'oura',
@@ -130,7 +185,7 @@ export const getUnifiedHealthData = async (req: Request, res: Response): Promise
           type: 'api',
           connected: wearableConnections.oura?.connected || false,
           lastSync: wearableConnections.oura?.lastSync?.toISOString(),
-          data: wearableConnections.oura?.healthData || null
+          data: transformHealthData(wearableConnections.oura?.healthData)
         }
       },
       lastSync: new Date().toISOString(),

@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './src/config/swagger';
 import { initializeFirebaseAdmin } from './src/utils/firebase';
 import { logger, errorHandler, notFound } from './src/middleware/essential.middleware';
 import { DatabaseService } from './src/utils/database';
@@ -40,6 +42,18 @@ const corsOptions = {
 app.use(logger);                    // 1. Log all requests
 app.use(cors(corsOptions));         // 2. Handle CORS
 app.use(express.json());            // 3. Parse JSON bodies
+
+// SWAGGER API DOCUMENTATION
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'H2Oasis API Documentation',
+}));
+
+// Swagger JSON endpoint
+app.get('/api-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
 
 // ROUTES
 app.use('/health', healthRoutes);
@@ -87,6 +101,7 @@ app.listen(port, '0.0.0.0', async () => {
   console.log(`Network access: http://192.168.1.76:${port}`);
   console.log(`Health check: http://localhost:${port}/health`);
   console.log(`Database test: http://localhost:${port}/health/database`);
+  console.log(`📚 API Documentation: http://localhost:${port}/api-docs`);
   
   // Auto-seed products on server start (like Django fixtures)
   try {
