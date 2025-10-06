@@ -28,32 +28,48 @@ interface RookConnectionStatus {
 
 /**
  * Get all wearable connections for a user from ROOK
+ * Checks each data source individually via authorizer endpoint
  */
 export const getUserConnections = async (userId: string): Promise<RookConnectionStatus> => {
   try {
     console.log(`🔍 Fetching ROOK connections for user: ${userId}`);
-    console.log(`📍 ROOK API URL: ${ROOK_BASE_URL}/v1/connections`);
-    console.log(`📍 Client UUID: ${ROOK_CLIENT_UUID}`);
     
-    const response = await axios.get(
-      `${ROOK_BASE_URL}/v1/connections`,
-      {
-        headers: {
-          'Authorization': `Basic ${Buffer.from(`${ROOK_CLIENT_UUID}:${ROOK_SECRET_KEY}`).toString('base64')}`,
-          'Content-Type': 'application/json',
-        },
-        params: {
-          user_id: userId,
-        }
-      }
-    );
+    const dataSources = ['oura', 'garmin', 'fitbit', 'whoop', 'polar'];
+    const connections: any = {};
 
-    console.log('✅ ROOK connections fetched:', JSON.stringify(response.data, null, 2));
-    return response.data;
+    // Check each data source individually
+    for (const dataSource of dataSources) {
+      try {
+        const response = await axios.get(
+          `${ROOK_BASE_URL}/api/v1/user_id/${userId}/data_source/${dataSource}/authorizer`,
+          {
+            headers: {
+              'User-Agent': 'H2Oasis/1.0.0',
+              'Authorization': `Basic ${Buffer.from(`${ROOK_CLIENT_UUID}:${ROOK_SECRET_KEY}`).toString('base64')}`,
+              'Accept': 'application/json',
+            }
+          }
+        );
+
+        connections[dataSource] = {
+          connected: response.data.authorized === true,
+          lastSync: new Date(),
+        };
+
+        console.log(`✅ ${dataSource}: ${response.data.authorized === true ? 'Connected' : 'Not connected'}`);
+      } catch (error: any) {
+        console.log(`ℹ️ ${dataSource}: Not connected or error checking`);
+        connections[dataSource] = {
+          connected: false,
+          lastSync: new Date(),
+        };
+      }
+    }
+
+    return { userId, connections };
 
   } catch (error: any) {
     console.error('❌ Error fetching ROOK connections:', error.response?.data || error.message);
-    console.error('❌ Full error:', error);
     throw error;
   }
 };

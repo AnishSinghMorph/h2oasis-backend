@@ -536,3 +536,103 @@ export const fetchRookHealthData = async (req: Request, res: Response): Promise<
     });
   }
 };
+
+/**
+ * Get ROOK Authorization URL
+ * Generates OAuth URL for wearable connection (keeps secret key secure on backend)
+ */
+export const getRookAuthURL = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.headers['x-firebase-uid'] as string;
+    const { mongoUserId, dataSource } = req.body;
+
+    if (!mongoUserId || !dataSource) {
+      res.status(400).json({ 
+        success: false, 
+        error: 'mongoUserId and dataSource are required' 
+      });
+      return;
+    }
+
+    console.log(`🔐 Generating ROOK auth URL for ${dataSource}...`);
+
+    // Get credentials from environment (secure - not exposed to frontend)
+    const clientUUID = process.env.ROOK_SANDBOX_CLIENT_UUID;
+    const secretKey = process.env.ROOK_SANDBOX_SECRET_KEY;
+    const baseUrl = process.env.ROOK_SANDBOX_BASE_URL || 'https://api.rook-connect.review';
+    
+    // Get redirect URL from environment
+    const redirectUri = process.env.EXPO_PUBLIC_OAUTH_REDIRECT_URL;
+    
+    if (!clientUUID || !secretKey) {
+      res.status(500).json({ 
+        success: false, 
+        error: 'ROOK credentials not configured on server' 
+      });
+      return;
+    }
+
+    if (!redirectUri) {
+      res.status(500).json({ 
+        success: false, 
+        error: 'OAuth redirect URL not configured on server' 
+      });
+      return;
+    }
+
+    // Call ROOK API to get authorization URL
+    const url = `${baseUrl}/api/v1/user_id/${mongoUserId}/data_source/${dataSource}/authorizer?redirect_url=${encodeURIComponent(redirectUri)}`;
+    
+    const credentials = `${clientUUID}:${secretKey}`;
+    const basicAuth = Buffer.from(credentials).toString('base64');
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'H2Oasis/1.0.0',
+        'Authorization': `Basic ${basicAuth}`,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`🚫 ROOK API Error: ${errorText}`);
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    
+    // Check if already authorized
+    if (data.authorized === true) {
+      res.json({
+        success: true,
+        data: {
+          isAlreadyConnected: true,
+          authorizationURL: '',
+        },
+      });
+      return;
+    }
+
+    // Return authorization URL
+    if (!data.authorization_url) {
+      throw new Error(`No authorization URL provided for ${dataSource}`);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        authorizationURL: data.authorization_url,
+        isAlreadyConnected: false,
+      },
+    });
+
+  } catch (error: any) {
+    console.error('❌ Error getting ROOK auth URL:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Failed to get authorization URL' 
+    });
+  }
+};

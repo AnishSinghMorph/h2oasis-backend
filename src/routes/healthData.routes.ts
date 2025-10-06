@@ -5,7 +5,8 @@ import {
   updateWearableConnection,
   getWearableConnections,
   syncRookConnections,
-  fetchRookHealthData
+  fetchRookHealthData,
+  getRookAuthURL
 } from '../controllers/healthData.controller';
 
 const router = Router();
@@ -228,6 +229,58 @@ router.get('/wearable-connections', getWearableConnections);
  *         description: Authentication required
  */
 router.post('/sync-rook', syncRookConnections);
+
+/**
+ * @swagger
+ * /api/health-data/rook-auth-url:
+ *   post:
+ *     summary: Get ROOK authorization URL
+ *     description: Generate OAuth authorization URL for connecting wearables (keeps secret key secure on backend)
+ *     tags: [Health Data]
+ *     security:
+ *       - FirebaseAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - mongoUserId
+ *               - dataSource
+ *             properties:
+ *               mongoUserId:
+ *                 type: string
+ *                 description: MongoDB User ID used in ROOK
+ *                 example: 68da80c9ffda7e51bd9ac167
+ *               dataSource:
+ *                 type: string
+ *                 description: Wearable data source
+ *                 enum: [oura, garmin, fitbit, whoop, polar]
+ *                 example: garmin
+ *     responses:
+ *       200:
+ *         description: Authorization URL generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     authorizationURL:
+ *                       type: string
+ *                       example: https://connect.garmin.com/oauth/authorize?...
+ *                     isAlreadyConnected:
+ *                       type: boolean
+ *       401:
+ *         description: Authentication required
+ */
+router.post('/rook-auth-url', getRookAuthURL);
 
 /**
  * @swagger
