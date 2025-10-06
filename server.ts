@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './src/config/swagger';
 import { initializeFirebaseAdmin } from './src/utils/firebase';
 import { logger, errorHandler, notFound } from './src/middleware/essential.middleware';
 import { DatabaseService } from './src/utils/database';
@@ -11,6 +13,7 @@ import chatRoutes from './src/routes/chat.routes';
 import ttsRoutes from './src/routes/tts.routes';
 import sttRoutes from './src/routes/stt.routes';
 import healthDataRoutes from './src/routes/healthData.routes';
+import elevenlabsRoutes from "./src/routes/elevenLabs.routes"
 
 
 
@@ -40,6 +43,18 @@ app.use(logger);                    // 1. Log all requests
 app.use(cors(corsOptions));         // 2. Handle CORS
 app.use(express.json());            // 3. Parse JSON bodies
 
+// SWAGGER API DOCUMENTATION
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'H2Oasis API Documentation',
+}));
+
+// Swagger JSON endpoint
+app.get('/api-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
+
 // ROUTES
 app.use('/health', healthRoutes);
 app.use('/api/auth', authRoutes);
@@ -48,6 +63,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/tts', ttsRoutes);
 app.use('/api/stt', sttRoutes);
 app.use('/api/health-data', healthDataRoutes);
+app.use('/api/elevenlabs', elevenlabsRoutes);
 
 // ROOK OAuth callback route (for wearable connections)
 app.get('/oauth/wearable/callback/client_uuid/:clientUuid/user_id/:userId', (req, res) => {
@@ -75,9 +91,9 @@ app.get('/oauth/wearable/callback/client_uuid/:clientUuid/user_id/:userId', (req
   `);
 });
 
-// ERROR HANDLING (Must be at the end)
-app.use(notFound);        // Handle 404s
-app.use(errorHandler);    // Handle all errors
+
+app.use(notFound);       
+app.use(errorHandler);   
 
 // Start server
 app.listen(port, '0.0.0.0', async () => {
@@ -85,6 +101,7 @@ app.listen(port, '0.0.0.0', async () => {
   console.log(`Network access: http://192.168.1.76:${port}`);
   console.log(`Health check: http://localhost:${port}/health`);
   console.log(`Database test: http://localhost:${port}/health/database`);
+  console.log(`📚 API Documentation: http://localhost:${port}/api-docs`);
   
   // Auto-seed products on server start (like Django fixtures)
   try {
