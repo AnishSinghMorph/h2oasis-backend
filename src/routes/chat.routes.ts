@@ -4,17 +4,109 @@ import { ChatController } from '../controllers/chat.controller';
 const router = Router();
 const chatController = new ChatController();
 
-// POST /api/chat/message - Send a message to AI with health context
+/**
+ * @swagger
+ * /api/chat/message:
+ *   post:
+ *     summary: Send message to AI assistant
+ *     description: Send a message to the AI assistant with health context. The AI uses health data to provide personalized recommendations.
+ *     tags: [Chat]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - message
+ *               - userId
+ *             properties:
+ *               message:
+ *                 type: string
+ *                 example: How was my sleep last night?
+ *               userId:
+ *                 type: string
+ *                 description: Firebase UID
+ *                 example: u6QJ1xtouUN9F6uGjUZEa5v2oS12
+ *               voiceId:
+ *                 type: string
+ *                 description: Optional ElevenLabs voice ID for TTS
+ *               useVoice:
+ *                 type: boolean
+ *                 description: Whether to return audio response
+ *     responses:
+ *       200:
+ *         description: AI response generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 response:
+ *                   type: string
+ *                   description: AI text response
+ *                 audioUrl:
+ *                   type: string
+ *                   description: URL to audio file (if useVoice is true)
+ *       400:
+ *         description: Invalid request
+ */
 router.post('/message', async (req: Request, res: Response) => {
   await chatController.sendMessage(req as any, res);
 });
 
-// GET /api/chat/health-context/:userId - Get user's health data for context
+/**
+ * @swagger
+ * /api/chat/health-context/{userId}:
+ *   get:
+ *     summary: Get health context for AI
+ *     description: Retrieve user's health data to provide context for AI conversations
+ *     tags: [Chat]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Firebase UID
+ *     responses:
+ *       200:
+ *         description: Health context retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 healthData:
+ *                   type: object
+ *       404:
+ *         description: User not found
+ */
 router.get('/health-context/:userId', async (req: Request, res: Response) => {
   await chatController.getHealthContext(req, res);
 });
 
-// POST /api/chat/history/:userId - Get chat history for a user (future feature)
+/**
+ * @swagger
+ * /api/chat/history/{userId}:
+ *   get:
+ *     summary: Get chat history (Coming Soon)
+ *     description: Retrieve chat conversation history for a user
+ *     tags: [Chat]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Chat history (feature coming soon)
+ */
 router.get('/history/:userId', async (req: Request, res: Response) => {
   // TODO: Implement chat history retrieval
   res.json({
@@ -24,7 +116,23 @@ router.get('/history/:userId', async (req: Request, res: Response) => {
   });
 });
 
-// DELETE /api/chat/history/:userId - Clear chat history (future feature)
+/**
+ * @swagger
+ * /api/chat/history/{userId}:
+ *   delete:
+ *     summary: Clear chat history (Coming Soon)
+ *     description: Delete all chat conversation history for a user
+ *     tags: [Chat]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Chat history cleared
+ */
 router.delete('/history/:userId', async (req: Request, res: Response) => {
   // TODO: Implement chat history clearing
   res.json({
