@@ -4,6 +4,7 @@ import { AuthService } from '../services/auth.service';
 import { User } from '../models/User.model';
 import { admin } from '../utils/firebase';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
+import redis from "../utils/redis"
 
 export class AuthController {
   
@@ -58,49 +59,74 @@ export class AuthController {
     });
   }
 
-  static async login(req: Request, res: Response) {
-    const { email, password } = req.body;
+static async login(req: Request, res: Response) {
+  const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email and password are required'
-      });
-    }
-
-    // Connect to database
-    await DatabaseService.connect();
-
-    // Find user in our database
-    const user = await User.findOne({ email: email.toLowerCase() });
-    
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid email or password'
-      });
-    }
-
-    // Create custom token that can be exchanged for ID token on client
-    const customToken = await admin.auth().createCustomToken(user.firebaseUid);
-
-    // Update last login
-    user.lastLoginAt = new Date();
-    await user.save();
-
-    return res.status(200).json({
-      success: true,
-      message: 'Login successful',
-      customToken: customToken,
-      firebaseUID: user.firebaseUid, // Use consistent naming
-      user: {
-        id: user._id,
-        email: user.email,
-        fullName: user.fullName,
-        displayName: user.displayName,
-      }
+  if (!email || !password) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email and password are required'
     });
   }
+
+  // Connect to database
+  await DatabaseService.connect();
+
+  const cacheKey = `user:${email.toLowerCase()}`;
+  let cachedUser = await redis.get(cacheKey);
+  let userDoc;
+  let userForResponse;
+
+  if (cachedUser) {
+    // Use cached user for response
+    userForResponse = JSON.parse(cachedUser);
+    // Fetch Mongoose doc for updating lastLoginAt
+    userDoc = await User.findOne({ email: email.toLowerCase() });
+  } else {
+    // Fetch from DB
+    userDoc = await User.findOne({ email: email.toLowerCase() });
+    if (userDoc) {
+      userForResponse = {
+        firebaseUid: userDoc.firebaseUid,
+        email: userDoc.email,
+        fullName: userDoc.fullName,
+        displayName: userDoc.displayName,
+        lastLoginAt: userDoc.lastLoginAt,
+        _id: userDoc._id
+      };
+      await redis.set(cacheKey, JSON.stringify(userForResponse), 'EX', 3600);
+    }
+  }
+
+  // If user not found in cache or DB
+  if (!userDoc) {
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid email or password'
+    });
+  }
+
+  // Create custom token that can be exchanged for ID token on client
+  const customToken = await admin.auth().createCustomToken(userDoc.firebaseUid);
+
+  // Update last login
+  userDoc.lastLoginAt = new Date();
+  await userDoc.save();
+
+  // Always use userForResponse for the response
+  return res.status(200).json({
+    success: true,
+    message: 'Login successful',
+    customToken: customToken,
+    firebaseUID: userDoc.firebaseUid,
+    user: {
+      id: userDoc._id,
+      email: userDoc.email,
+      fullName: userDoc.fullName,
+      displayName: userDoc.displayName,
+    }
+  });
+}
 
   static async getProfile(req: AuthenticatedRequest, res: Response) {
     await DatabaseService.connect();
