@@ -52,6 +52,7 @@
     "firebase-admin": "^13.5.0",
     "firebase-functions": "^6.4.0",
     "form-data": "^4.0.4",
+    "ioredis": "^5.8.1",
     "mongoose": "^8.18.0",
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
@@ -63,8 +64,8 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "@types/node": "^24.5.2",
     "@types/jest": "^29.5.14",
+    "@types/node": "^24.5.2",
     "@types/supertest": "^6.0.2",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
