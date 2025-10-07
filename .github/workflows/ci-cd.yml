@@ -23,7 +23,7 @@ jobs:
         cache: 'npm'
         
     - name: Install Dependencies
-      run: npm ci
+      run: npm install --legacy-peer-deps
       
     - name: Lint Code
       run: npm run lint || echo "No lint script found, skipping..."
@@ -54,7 +54,7 @@ jobs:
         cache: 'npm'
         
     - name: Install Dependencies
-      run: npm ci
+      run: npm install --legacy-peer-deps
       
     - name: Security Audit
       run: npm audit --audit-level moderate
@@ -81,7 +81,7 @@ jobs:
         cache: 'npm'
         
     - name: Install Dependencies
-      run: npm ci
+      run: npm install --legacy-peer-deps
       
     - name: Build Project
       run: npm run build
