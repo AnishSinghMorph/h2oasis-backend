@@ -31,12 +31,18 @@ jobs:
     - name: Build TypeScript
       run: npm run build
       
-    - name: Run Tests
-      run: npm test || echo "No tests found, skipping..."
+    - name: Run Tests with Coverage
+      run: npm test -- --coverage
+      env:
+        CI: true
       
     - name: Upload Coverage
       uses: codecov/codecov-action@v3
       if: success()
+      with:
+        files: ./coverage/lcov.info
+        flags: backend
+        name: h2oasis-backend
       
   # ===== SECURITY SCAN =====
   security:
