@@ -10,6 +10,7 @@
     "build": "tsc",
     "dev": "ts-node server.ts",
     "start": "node lib/server.js",
+    "start:dev": "nodemon --watch src --ext ts,js,json --exec ts-node server.ts",
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
     "deploy": "firebase deploy --only functions",
