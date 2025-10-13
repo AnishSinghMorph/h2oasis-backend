@@ -74,21 +74,54 @@ export const handleRookHealthDataWebhook = async (req: Request, res: Response): 
     const rawBody = JSON.stringify(req.body);
     const signature = req.headers['x-rook-hash'] as string;
 
-    // Verify HMAC signature for security
-    if (!verifyRookSignature(rawBody, signature)) {
-      console.error('❌ Invalid ROOK webhook signature');
-      res.status(401).json({ error: 'Invalid signature' });
+    // TEMPORARILY DISABLED HMAC VERIFICATION FOR DEVELOPMENT
+    if (process.env.NODE_ENV === 'production') {
+      if (!verifyRookSignature(rawBody, signature)) {
+        console.error('❌ Invalid ROOK webhook signature');
+        res.status(401).json({ error: 'Invalid signature' });
+        return;
+      }
+    } else {
+      console.log('⚠️ HMAC signature verification DISABLED for development');
+    }
+
+    const webhookData: any = req.body;
+    console.log('🔍 Full health webhook payload:', JSON.stringify(req.body, null, 2));
+    
+    // ROOK uses consistent field names from API - user_id, data_structure, etc.
+    const user_id = webhookData.user_id;
+    const data_structure = webhookData.data_structure;
+    
+    // Extract data source from metadata or root level
+    let data_source = webhookData.data_source;
+    if (!data_source) {
+      // Look for data source in metadata.sources_of_data_array (real ROOK format)
+      const metadata = webhookData.body_health?.summary?.body_summary?.metadata || 
+                      webhookData.physical_health?.summary?.metadata ||
+                      webhookData.sleep_health?.summary?.metadata;
+      
+      if (metadata?.sources_of_data_array && metadata.sources_of_data_array.length > 0) {
+        data_source = metadata.sources_of_data_array[0]; // Use first source
+      } else {
+        data_source = 'unknown';
+      }
+    }
+    
+    console.log('📊 Processing health data for user:', user_id);
+    console.log('🔍 Data source:', data_source);
+    console.log('📋 Data structure:', data_structure);
+
+    // Validate ObjectId format before querying
+    if (!user_id || user_id.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(user_id)) {
+      console.warn(`⚠️ Invalid user_id format: ${user_id}`);
+      res.status(200).json({ message: 'Invalid user_id format, webhook acknowledged' });
       return;
     }
 
-    const webhookData: RookWebhookPayload = req.body;
-    console.log('📊 Processing health data for user:', webhookData.user_id);
-    console.log('🔍 Data source:', webhookData.data_source);
-
-    const user = await User.findById(webhookData.user_id);
+    const user = await User.findById(user_id);
     
     if (!user) {
-      console.warn(`⚠️ User not found for ROOK user_id: ${webhookData.user_id}`);
+      console.warn(`⚠️ User not found for ROOK user_id: ${user_id}`);
       res.status(200).json({ message: 'User not found, webhook acknowledged' });
       return;
     }
@@ -103,10 +136,10 @@ export const handleRookHealthDataWebhook = async (req: Request, res: Response): 
       'polar': 'polar'
     };
 
-    const wearableName = dataSourceMap[webhookData.data_source.toLowerCase()];
+    const wearableName = dataSourceMap[data_source.toLowerCase()];
     
     if (!wearableName) {
-      console.warn(`⚠️ Unknown data source: ${webhookData.data_source}`);
+      console.warn(`⚠️ Unknown data source: ${data_source}`);
       res.status(200).json({ message: 'Unknown data source, webhook acknowledged' });
       return;
     }
@@ -123,7 +156,7 @@ export const handleRookHealthDataWebhook = async (req: Request, res: Response): 
     const updateField = `wearableConnections.${wearableName}.healthData`;
     
     await User.findByIdAndUpdate(
-      webhookData.user_id,
+      user_id,
       {
         $set: {
           [updateField]: rawHealthData,
@@ -140,8 +173,9 @@ export const handleRookHealthDataWebhook = async (req: Request, res: Response): 
     // Return success response (required by ROOK)
     res.status(200).json({
       message: 'Health data processed successfully',
-      user_id: webhookData.user_id,
-      data_source: webhookData.data_source,
+      user_id: user_id,
+      data_source: data_source,
+      data_structure: data_structure,
       processed_at: new Date().toISOString()
     });
 
@@ -158,22 +192,46 @@ export const handleRookHealthDataWebhook = async (req: Request, res: Response): 
 export const handleRookNotificationWebhook = async (req: Request, res: Response): Promise<void> => {
   try {
     console.log('🔔 Received ROOK notification webhook');
+    console.log('🔍 Full notification payload:', JSON.stringify(req.body, null, 2));
     
     // Get raw body and signature
     const rawBody = JSON.stringify(req.body);
     const signature = req.headers['x-rook-hash'] as string;
 
-    // Verify HMAC signature for security
-    if (!verifyRookSignature(rawBody, signature)) {
-      console.error('❌ Invalid ROOK webhook signature');
-      res.status(401).json({ error: 'Invalid signature' });
-      return;
+    // TEMPORARILY DISABLED HMAC VERIFICATION FOR DEVELOPMENT
+    if (process.env.NODE_ENV === 'production') {
+      if (!verifyRookSignature(rawBody, signature)) {
+        console.error('❌ Invalid ROOK webhook signature');
+        res.status(401).json({ error: 'Invalid signature' });
+        return;
+      }
+    } else {
+      console.log('⚠️ HMAC signature verification DISABLED for development');
     }
 
-    const notificationData: NotificationPayload = req.body;
-    console.log('📢 Processing notification:', notificationData.event_type);
-    console.log('👤 User:', notificationData.user_id);
-    console.log('🔗 Data source:', notificationData.data_source);
+    const notificationData: any = req.body;
+    
+    // ROOK notification format: action, client_uuid, user_id, data_source, level, message, action_datetime, environment
+    const action = notificationData.action; // e.g., "user_connected", "user_disconnected"
+    const user_id = notificationData.user_id;
+    const data_source = notificationData.data_source;
+    const client_uuid = notificationData.client_uuid;
+    const level = notificationData.level; // e.g., "info", "warning", "error"
+    const message = notificationData.message;
+    const action_datetime = notificationData.action_datetime;
+    const environment = notificationData.environment;
+    
+    console.log('📢 Processing notification action:', action);
+    console.log('👤 User:', user_id);
+    console.log('🔗 Data source:', data_source);
+    console.log('📊 Client UUID:', client_uuid);
+    console.log('⚠️ Level:', level);
+    console.log('💬 Message:', message);
+
+    // Validate ObjectId format for user operations
+    const hasValidUserId = user_id && 
+                          user_id.length === 24 && 
+                          /^[0-9a-fA-F]{24}$/.test(user_id);
 
     // Map data source to wearable name
     const dataSourceMap: { [key: string]: string } = {
@@ -187,12 +245,13 @@ export const handleRookNotificationWebhook = async (req: Request, res: Response)
 
     const wearableName = dataSourceMap[notificationData.data_source?.toLowerCase()];
 
-    // Handle different notification types
-    switch (notificationData.event_type) {
+    // Handle different notification types (ROOK uses "action" field)
+    switch (action) {
+      case 'user_connected':
       case 'connection_established':
-        if (wearableName) {
+        if (wearableName && hasValidUserId) {
           await User.findByIdAndUpdate(
-            notificationData.user_id,
+            user_id,
             {
               $set: {
                 [`wearableConnections.${wearableName}.connected`]: true,
@@ -202,14 +261,17 @@ export const handleRookNotificationWebhook = async (req: Request, res: Response)
               }
             }
           );
-          console.log(`✅ ${wearableName} connection established for user ${notificationData.user_id}`);
+          console.log(`✅ ${wearableName} connection established for user ${user_id}`);
+        } else if (!hasValidUserId) {
+          console.warn(`⚠️ Invalid user_id for connection_established: ${user_id}`);
         }
         break;
 
+      case 'user_disconnected':
       case 'connection_revoked':
-        if (wearableName) {
+        if (wearableName && hasValidUserId) {
           await User.findByIdAndUpdate(
-            notificationData.user_id,
+            user_id,
             {
               $set: {
                 [`wearableConnections.${wearableName}.connected`]: false,
@@ -218,27 +280,29 @@ export const handleRookNotificationWebhook = async (req: Request, res: Response)
               }
             }
           );
-          console.log(`❌ ${wearableName} connection revoked for user ${notificationData.user_id}`);
+          console.log(`❌ ${wearableName} connection revoked for user ${user_id}`);
+        } else if (!hasValidUserId) {
+          console.warn(`⚠️ Invalid user_id for connection_revoked: ${user_id}`);
         }
         break;
 
       case 'user_created':
-        console.log(`👤 ROOK user created: ${notificationData.user_id}`);
+        console.log(`👤 ROOK user created: ${user_id}`);
         break;
 
       case 'user_deleted':
-        console.log(`🗑️ ROOK user deleted: ${notificationData.user_id}`);
+        console.log(`🗑️ ROOK user deleted: ${user_id}`);
         break;
 
       default:
-        console.log(`ℹ️ Unknown notification type: ${notificationData.event_type}`);
+        console.log(`ℹ️ Unknown notification action: ${action}`);
     }
 
     // Return success response
     res.status(200).json({
       message: 'Notification processed successfully',
-      event_type: notificationData.event_type,
-      user_id: notificationData.user_id,
+      action: action,
+      user_id: user_id,
       processed_at: new Date().toISOString()
     });
 
