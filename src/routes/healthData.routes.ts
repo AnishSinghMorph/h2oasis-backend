@@ -5,7 +5,7 @@ import {
   updateWearableConnection,
   getWearableConnections,
   syncRookConnections,
-  fetchRookHealthData,
+  // fetchRookHealthData, // DISABLED - using webhooks instead
   getRookAuthURL
 } from '../controllers/healthData.controller';
 
@@ -340,6 +340,7 @@ router.post('/rook-auth-url', getRookAuthURL);
  *       401:
  *         description: Authentication required
  */
-router.post('/fetch-rook-data', fetchRookHealthData);
+// COMMENTED OUT: Manual API fetching - using webhooks instead
+// router.post('/fetch-rook-data', fetchRookHealthData);
 
 export default router;

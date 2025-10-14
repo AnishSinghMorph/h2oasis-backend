@@ -13,7 +13,9 @@ import chatRoutes from './src/routes/chat.routes';
 import ttsRoutes from './src/routes/tts.routes';
 import sttRoutes from './src/routes/stt.routes';
 import healthDataRoutes from './src/routes/healthData.routes';
-import elevenlabsRoutes from "./src/routes/elevenLabs.routes"
+import elevenlabsRoutes from "./src/routes/elevenLabs.routes";
+import webhookRoutes from './src/routes/webhook.routes';
+import { rookWebhookService } from './src/services/webhooks.service';
 
 
 
@@ -65,6 +67,9 @@ app.use('/api/stt', sttRoutes);
 app.use('/api/health-data', healthDataRoutes);
 app.use('/api/elevenlabs', elevenlabsRoutes);
 
+// WEBHOOK ROUTES (No authentication required - validated via HMAC)
+app.use('/api/webhooks/rook', webhookRoutes);
+
 // ROOK OAuth callback route (for wearable connections)
 app.get('/oauth/wearable/callback/client_uuid/:clientUuid/user_id/:userId', (req, res) => {
   const { clientUuid, userId } = req.params;
@@ -102,6 +107,9 @@ app.listen(port, '0.0.0.0', async () => {
   console.log(`Health check: http://localhost:${port}/health`);
   console.log(`Database test: http://localhost:${port}/health/database`);
   console.log(`📚 API Documentation: http://localhost:${port}/api-docs`);
+  
+  // Log webhook configuration
+  rookWebhookService.logConfigurationStatus();
   
   // Auto-seed products on server start (like Django fixtures)
   try {

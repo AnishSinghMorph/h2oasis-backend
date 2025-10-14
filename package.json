@@ -4,7 +4,7 @@
   "description": "Authentication backend for H2Oasis - Firebase Functions with TypeScript",
   "main": "lib/server.js",
   "engines": {
-    "node": "20.x"
+    "node": ">=20.x"
   },
   "scripts": {
     "build": "tsc",
@@ -19,6 +19,7 @@
     "test:watch": "jest --config jest.config.js --watch",
     "test:coverage": "jest --config jest.config.js --coverage",
     "test:ci": "jest --config jest.config.js --ci --coverage --maxWorkers=2",
+    "test:webhooks": "npm run build && node scripts/test-webhooks.js",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "type-check": "tsc --noEmit",
