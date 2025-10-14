@@ -43,6 +43,7 @@ const UserSchema = new Schema<IUser>({
     type: String,
     required: true,
     unique: true,
+    index: true,
     lowercase: true,
     match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
   },
@@ -54,6 +55,7 @@ const UserSchema = new Schema<IUser>({
   phone: {
     type: String,
     sparse: true, // Allows multiple null values but unique non-null values
+    index: true,
     match: [/^\+?[\d\s\-\(\)]+$/, 'Please enter a valid phone number']
   },
   displayName: {
@@ -108,10 +110,7 @@ const UserSchema = new Schema<IUser>({
   collection: 'users'
 });
 
-// Indexes for better query performance
-UserSchema.index({ firebaseUid: 1 });
-UserSchema.index({ email: 1 });
-UserSchema.index({ phone: 1 }, { sparse: true });
+// Additional indexes for better query performance (not duplicating field-level indexes)
 UserSchema.index({ provider: 1 });
 UserSchema.index({ isActive: 1 });
 
