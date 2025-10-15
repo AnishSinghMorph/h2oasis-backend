@@ -1,0 +1,71 @@
+# GitHub Actions Workflow: Build and Push Docker Image to Docker Hub
+# This workflow automatically builds your Docker image and pushes it to Docker Hub
+# whenever you push code to the main branch
+
+name: Build and Push Docker Image
+
+# Trigger this workflow on:
+on:
+  push:
+    branches:
+      - main          # Run on pushes to main branch
+      - rook-data     # Run on pushes to rook-data branch (your current branch)
+  pull_request:
+    branches:
+      - main          # Run on PRs to main branch
+
+# Define the jobs to run
+jobs:
+  # Job 1: Build and push Docker image
+  build-and-push:
+    name: Build Docker Image and Push to Docker Hub
+    runs-on: ubuntu-latest  # Use GitHub's Ubuntu runner
+    
+    steps:
+      # Step 1: Checkout your code from GitHub
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      # Step 2: Set up Docker Buildx (advanced build features)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      # Step 3: Login to Docker Hub using secrets
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      # Step 4: Extract metadata (tags, labels) for Docker
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: morphdigital/h2oasis-backend
+          tags: |
+            # Tag with 'latest' on main branch
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Tag with git commit SHA (first 7 characters)
+            type=sha,prefix={{branch}}-,format=short
+            # Tag with branch name
+            type=ref,event=branch
+            # Tag with version if you create a git tag (e.g., v1.0.0)
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      
+      # Step 5: Build and push Docker image
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .                          # Build from current directory
+          file: ./Dockerfile                   # Use this Dockerfile
+          push: true                           # Push to Docker Hub after building
+          tags: ${{ steps.meta.outputs.tags }} # Use tags from metadata step
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=morphdigital/h2oasis-backend:buildcache
+          cache-to: type=registry,ref=morphdigital/h2oasis-backend:buildcache,mode=max
+      
+      # Step 6: Print image details (for debugging)
+      - name: Image digest
+        run: echo "Image pushed with digest ${{ steps.build.outputs.digest }}"
