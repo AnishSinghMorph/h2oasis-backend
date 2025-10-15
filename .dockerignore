@@ -79,3 +79,4 @@ temp/
 *.tmp
 
 
+k8s/secrets/
