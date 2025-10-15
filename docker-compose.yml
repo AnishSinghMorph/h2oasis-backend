@@ -1,16 +1,21 @@
 version: '3.8'
 
 services:
+  # Backend API Service
   h2oasis-backend:
     build: .
+    container_name: h2oasis-backend
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379  # Connect to Redis service by name
     env_file:
       - .env
     volumes:
       - ./uploads:/app/uploads
+    depends_on:
+      - redis  # Wait for Redis to start first
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
@@ -18,7 +23,29 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks:
+      - h2oasis-network
+
+  # Redis Cache Service
+  redis:
+    image: redis:7-alpine
+    container_name: h2oasis-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data  # Persist Redis data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - h2oasis-network
 
 networks:
-  default:
-    name: h2oasis-network
+  h2oasis-network:
+    driver: bridge
+
+volumes:
+  redis_data:  # Named volume for Redis data persistence
