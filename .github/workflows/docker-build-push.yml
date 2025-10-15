@@ -1,6 +1,6 @@
 # GitHub Actions Workflow: Build and Push Docker Image to Docker Hub
 # This workflow automatically builds your Docker image and pushes it to Docker Hub
-# whenever you push code to the main branch
+# whenever you push code to ANY branch
 
 name: Build and Push Docker Image
 
@@ -8,11 +8,10 @@ name: Build and Push Docker Image
 on:
   push:
     branches:
-      - main          # Run on pushes to main branch
-      - rook-data     # Run on pushes to rook-data branch (your current branch)
+      - '**'        # Run on pushes to ALL branches (main, feature branches, etc.)
   pull_request:
     branches:
-      - main          # Run on PRs to main branch
+      - main        # Run on PRs to main branch
 
 # Define the jobs to run
 jobs:
