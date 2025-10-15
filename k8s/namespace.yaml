@@ -1,0 +1,11 @@
+# Namespace: Logical isolation for your application
+# Think of it like a folder that contains all your app's resources
+# This keeps your app separate from other apps in the cluster
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: h2oasis
+  labels:
+    name: h2oasis
+    environment: development

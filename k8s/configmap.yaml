@@ -1,0 +1,18 @@
+# ConfigMap: Non-sensitive environment variables
+# Think of this as your .env file but for Kubernetes
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: h2oasis-backend-config
+  namespace: h2oasis
+data:
+  # Environment variables that are safe to expose
+  NODE_ENV: "development"
+  REDIS_URL: "redis://redis:6379"
+  CORS_ORIGINS: "http://localhost:19006,exp://192.168.1.100:19000"
+  ROOK_SANDBOX_BASE_URL: "https://api.rook-connect.review"
+  
+  # Note: Your actual MongoDB URI, API keys, etc. should go in a Secret
+  # We'll create those manually or use a secret management tool
+  # For now, we'll use this ConfigMap for demonstration

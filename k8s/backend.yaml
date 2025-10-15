@@ -1,0 +1,87 @@
+# Backend Deployment and Service
+# This runs your Node.js/Express backend application
+
+---
+# Deployment: Manages your backend pods
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: h2oasis-backend
+  namespace: h2oasis
+  labels:
+    app: h2oasis-backend
+spec:
+  replicas: 2  # Run 2 instances for high availability (can scale up/down)
+  selector:
+    matchLabels:
+      app: h2oasis-backend
+  template:
+    metadata:
+      labels:
+        app: h2oasis-backend
+    spec:
+      containers:
+      - name: backend
+        image: morphdigital/h2oasis-backend:latest  # Pull from Docker Hub
+        imagePullPolicy: Always  # Always pull latest image
+        ports:
+        - containerPort: 3000
+          name: http
+        
+        # Environment variables from ConfigMap
+        envFrom:
+        - configMapRef:
+            name: h2oasis-backend-config
+        # Load ALL environment variables from Secret
+        - secretRef:
+            name: h2oasis-backend-secrets
+        
+        resources:
+          # Resource limits
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
+          requests:
+            memory: "256Mi"
+            cpu: "500m"
+        
+        # Health checks
+        livenessProbe:
+          # Check if container is alive
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          # Check if container is ready to receive traffic
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+---
+# Service: Exposes your backend to other services and external traffic
+apiVersion: v1
+kind: Service
+metadata:
+  name: h2oasis-backend
+  namespace: h2oasis
+  labels:
+    app: h2oasis-backend
+spec:
+  type: NodePort  # For local testing (use LoadBalancer in AWS)
+  ports:
+  - port: 3000        # Service port
+    targetPort: 3000  # Container port
+    nodePort: 30000   # External port for local access
+    protocol: TCP
+    name: http
+  selector:
+    app: h2oasis-backend  # Route to backend pods
