@@ -3,6 +3,7 @@ import { User } from '../models/User.model';
 import { UserSelection } from '../models/UserSelection.model';
 import { Product } from '../models/Product.model';
 import { getUserConnections, getAllHealthDataForSource } from '../services/rook.service';
+import { IHealthData } from '../models/HealthData.types';
 
 interface WearableData {
   id: string;
@@ -10,13 +11,7 @@ interface WearableData {
   type: 'api' | 'sdk';
   connected: boolean;
   lastSync?: string;
-  data?: {
-    sleep?: any;
-    activity?: any;
-    heartRate?: any;
-    body?: any;
-    nutrition?: any;
-  };
+  data?: IHealthData | null;
 }
 
 // REMOVED: transformHealthData function to avoid confusion with webhook data

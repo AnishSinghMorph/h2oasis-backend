@@ -1,6 +1,10 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
 import { User } from '../models/User.model';
+import { HealthDataTransformer } from '../services/healthData.transformer.service';
+import { HealthDataMerger } from '../services/healthData.merger.service';
+import { IRookWebhookPayload } from '../models/HealthData.types';
+import { WebhookProcessor } from '../services/webhook.processor.service';
 
 /**
  * ROOK Webhook Controller
@@ -97,8 +101,8 @@ export const handleRookHealthDataWebhook = async (req: Request, res: Response): 
     if (!data_source) {
       // Look for data source in metadata.sources_of_data_array (real ROOK format)
       const metadata = webhookData.body_health?.summary?.body_summary?.metadata || 
-                      webhookData.physical_health?.summary?.metadata ||
-                      webhookData.sleep_health?.summary?.metadata;
+                      webhookData.physical_health?.summary?.physical_summary?.metadata ||
+                      webhookData.sleep_health?.summary?.sleep_summary?.metadata;
       
       if (metadata?.sources_of_data_array && metadata.sources_of_data_array.length > 0) {
         data_source = metadata.sources_of_data_array[0]; // Use first source
@@ -144,37 +148,30 @@ export const handleRookHealthDataWebhook = async (req: Request, res: Response): 
       return;
     }
 
-    // Store raw ROOK data with minimal processing
-    const rawHealthData = {
-      ...webhookData,
-      deliveredVia: 'webhook',
-      lastFetched: new Date(),
-      processedAt: new Date()
-    };
+    const payload: IRookWebhookPayload = webhookData;
 
-    // Update user's wearable health data
-    const updateField = `wearableConnections.${wearableName}.healthData`;
-    
-    await User.findByIdAndUpdate(
+    // ✅ Use WebhookProcessor with retry logic
+    const result = await WebhookProcessor.processWebhook(
       user_id,
-      {
-        $set: {
-          [updateField]: rawHealthData,
-          [`wearableConnections.${wearableName}.lastSync`]: new Date(),
-          updatedAt: new Date(),
-        }
-      },
-      { new: true }
+      wearableName,
+      data_structure,
+      payload
     );
 
-    console.log(`✅ Raw health data stored for ${wearableName} via webhook`);
-    console.log(`� Raw ROOK data keys: ${Object.keys(webhookData).filter(k => k !== 'user_id' && k !== 'timestamp').join(', ')}`);
+    if (!result.success) {
+      console.warn(`⚠️ ${result.message}`);
+      res.status(200).json({ message: result.message, webhook_acknowledged: true });
+      return;
+    }
 
-    // Return success response (required by ROOK)
+    console.log(`📊 Data type updated: ${result.dataType}`);
+
     res.status(200).json({
-      message: 'Health data processed successfully',
+      success: true,
+      message: 'Health data processed and merged successfully',
       user_id: user_id,
-      data_source: data_source,
+      wearable: wearableName,
+      data_type: result.dataType,
       data_structure: data_structure,
       processed_at: new Date().toISOString()
     });
