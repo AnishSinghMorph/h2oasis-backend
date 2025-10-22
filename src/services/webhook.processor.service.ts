@@ -30,6 +30,8 @@ export class WebhookProcessor {
     retryCount = 0
   ): Promise<ProcessWebhookResult> {
     try {
+      console.log(`🔄 Processing webhook for ${wearableName}, data_structure: ${dataStructure}`);
+      
       // Transform data
       const transformedData = HealthDataTransformer.transform(payload);
 
@@ -40,6 +42,9 @@ export class WebhookProcessor {
         };
       }
 
+      console.log(`✅ Transformed data keys:`, Object.keys(transformedData));
+      console.log(`📦 Transformed data sample:`, JSON.stringify(transformedData).substring(0, 200));
+
       // Get data type
       const dataType = HealthDataMerger.getDataType(dataStructure);
 
@@ -49,6 +54,8 @@ export class WebhookProcessor {
           message: 'Unknown data type',
         };
       }
+      
+      console.log(`📝 Data type mapped to: ${dataType}`);
 
       // Get user
       const user = await User.findById(userId);
@@ -71,6 +78,9 @@ export class WebhookProcessor {
         ? { ...existingDataForType, ...transformedData }
         : transformedData;
 
+      console.log(`💾 About to save to path: ${updateField}`);
+      console.log(`💾 Data being saved (first 300 chars):`, JSON.stringify(mergedDataForType).substring(0, 300));
+
       // ✅ FIX: Check if healthData is null and initialize it first
       const healthDataPath = `wearableConnections.${wearableName}.healthData`;
       const currentHealthData = user.wearableConnections?.[wearableName]?.healthData;
@@ -90,7 +100,7 @@ export class WebhookProcessor {
       }
 
       // Now do the atomic update on the specific data type
-      await User.findByIdAndUpdate(
+      const updateResult = await User.findByIdAndUpdate(
         userId,
         {
           $set: {
@@ -104,6 +114,10 @@ export class WebhookProcessor {
       );
 
       console.log(`✅ Clean health data saved for ${wearableName} (${dataType})`);
+      
+      // Verify what was actually saved
+      const savedData = updateResult?.wearableConnections?.[wearableName]?.healthData?.[dataType];
+      console.log(`🔍 Verification - saved data keys:`, savedData ? Object.keys(savedData) : 'null');
 
       return {
         success: true,

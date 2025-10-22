@@ -92,6 +92,46 @@ router.get('/health-context/:userId', async (req: Request, res: Response) => {
 
 /**
  * @swagger
+ * /api/chat/generate-plan:
+ *   post:
+ *     summary: Generate personalized recovery plan
+ *     description: Creates a personalized recovery plan based on user's health data and selected product
+ *     tags: [Chat]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 description: Firebase UID
+ *               healthData:
+ *                 type: object
+ *               productContext:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: Recovery plan generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 plan:
+ *                   type: object
+ */
+router.post('/generate-plan', async (req: Request, res: Response) => {
+  await chatController.generatePlan(req, res);
+});
+
+/**
+ * @swagger
  * /api/chat/history/{userId}:
  *   get:
  *     summary: Get chat history (Coming Soon)

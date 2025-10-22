@@ -46,13 +46,18 @@ export class ChatController {
       // Generate AI response
       const aiResponse = await this.openAIService.generateResponse(context);
 
+      // Check if response contains action marker
+      const hasAction = aiResponse.includes('[ACTION:CREATE_PLAN]');
+      const cleanResponse = aiResponse.replace('[ACTION:CREATE_PLAN]', '').trim();
+
       // Save chat message to database (implement this later)
       // await this.saveChatMessage(userId, message, aiResponse);
 
       res.json({
         success: true,
-        response: aiResponse,
+        response: cleanResponse,
         timestamp: new Date().toISOString(),
+        action: hasAction ? 'CREATE_PLAN' : null,
         context: {
           healthDataReceived: !!healthData,
           productContext: context.productContext
@@ -113,4 +118,52 @@ export class ChatController {
     // TODO: Implement database storage for chat history
     console.log(`Saving chat for user ${userId}: ${userMessage} -> ${aiResponse}`);
   }
+
+  generatePlan = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { userId, healthData, productContext } = req.body;
+
+      if (!userId) {
+        res.status(400).json({
+          error: 'userId is required'
+        });
+        return;
+      }
+
+      console.log('📋 Generating recovery plan for user:', userId);
+
+      // Default product context if not provided
+      const defaultProductContext = {
+        productName: 'H2Oasis Recovery System',
+        productType: 'recovery_suite' as const,
+        features: ['Cold Plunge', 'Hot Tub', 'Sauna']
+      };
+
+      // Build context for plan generation
+      const context = {
+        healthData: healthData || {},
+        productContext: productContext || defaultProductContext,
+        userMessage: 'Generate my recovery plan',
+        userId
+      };
+
+      // Generate personalized recovery plan
+      const recoveryPlan = await this.openAIService.generateRecoveryPlan(context);
+
+      console.log('✅ Recovery plan generated');
+
+      res.json({
+        success: true,
+        plan: recoveryPlan,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Plan generation error:', error);
+      res.status(500).json({
+        error: 'Failed to generate recovery plan',
+        message: 'Unable to create plan. Please try again.'
+      });
+    }
+  };
 }
