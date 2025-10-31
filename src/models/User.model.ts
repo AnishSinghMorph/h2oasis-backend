@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import {IHealthData} from "./HealthData.types" 
 
 // Wearable connection interface
 export interface IWearableConnection {
@@ -8,7 +9,7 @@ export interface IWearableConnection {
   connected: boolean;
   lastSync?: Date;
   connectedAt?: Date;
-  healthData?: any; // Store actual health data from the wearable
+  healthData?: IHealthData;
 }
 
 // User interface for TypeScript
