@@ -15,8 +15,14 @@ export class DatabaseService {
     const readyState = mongoose.connection.readyState as number;
     
     // If already connected and healthy, return immediately
-    if (readyState === 1) {
+    if (readyState === 1 && this.isConnected) {
       return;
+    }
+
+    // If connection dropped (readyState 0 = disconnected), log it
+    if (readyState === 0 && this.isConnected) {
+      console.log("⚠️ Connection was lost, reconnecting...");
+      this.isConnected = false;
     }
 
     // If currently connecting, wait for it
@@ -34,13 +40,18 @@ export class DatabaseService {
 
     // If in a broken state (connecting/disconnecting), force cleanup
     if (readyState === 2 || readyState === 3) {
-      console.log(`Mongoose in transitional state ${readyState}, cleaning up...`);
+      console.log(`⚠️ Mongoose in transitional state ${readyState}, cleaning up...`);
       try {
         await mongoose.disconnect();
         await new Promise(resolve => setTimeout(resolve, 500));
       } catch (err) {
         console.log("Error during cleanup:", err);
       }
+    }
+
+    // If disconnected (readyState 0), reconnect
+    if (readyState === 0) {
+      console.log("🔌 Connection is disconnected, will reconnect...");
     }
 
     this.isConnecting = true;
