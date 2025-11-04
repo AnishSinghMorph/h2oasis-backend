@@ -11,9 +11,20 @@ export class DatabaseService {
   private static isConnected = false;
 
   static async connect(): Promise<void> {
-    if (this.isConnected) {
+    // Check actual mongoose connection state, not just our flag
+    if (mongoose.connection.readyState === 1) {
       console.log("Already connected to MongoDB");
       return;
+    }
+
+    // If connection exists but is not ready, disconnect and reconnect
+    if (mongoose.connection.readyState !== 0) {
+      console.log("Mongoose connection in invalid state, reconnecting...");
+      try {
+        await mongoose.disconnect();
+      } catch (err) {
+        console.log("Error disconnecting stale connection:", err);
+      }
     }
 
     try {
@@ -23,24 +34,32 @@ export class DatabaseService {
       }
 
       await mongoose.connect(mongoUri, {
-        maxPoolSize: 10, // Maximum number of connections
-        serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
-        socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+        maxPoolSize: 10,
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
+        autoIndex: true,
       });
 
       this.isConnected = true;
       console.log("Connected to MongoDB Atlas successfully");
 
-      // Handle connection events
-      mongoose.connection.on("error", (error) => {
-        console.error("MongoDB connection error:", error);
-        this.isConnected = false;
-      });
+      // Handle connection events (only set up once)
+      if (!mongoose.connection.listeners("error").length) {
+        mongoose.connection.on("error", (error) => {
+          console.error("MongoDB connection error:", error);
+          this.isConnected = false;
+        });
 
-      mongoose.connection.on("disconnected", () => {
-        console.log("MongoDB disconnected");
-        this.isConnected = false;
-      });
+        mongoose.connection.on("disconnected", () => {
+          console.log("MongoDB disconnected");
+          this.isConnected = false;
+        });
+
+        mongoose.connection.on("reconnected", () => {
+          console.log("MongoDB reconnected");
+          this.isConnected = true;
+        });
+      }
     } catch (error) {
       console.error("Failed to connect to MongoDB:", error);
       this.isConnected = false;
