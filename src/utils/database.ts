@@ -9,19 +9,41 @@ dotenv.config();
  */
 export class DatabaseService {
   private static isConnected = false;
+  private static isConnecting = false;
 
   static async connect(): Promise<void> {
-    // Always disconnect first to ensure clean state
-    if (mongoose.connection.readyState !== 0) {
-      console.log(`Mongoose state: ${mongoose.connection.readyState}, forcing disconnect...`);
+    const readyState = mongoose.connection.readyState as number;
+    
+    // If already connected and healthy, return immediately
+    if (readyState === 1) {
+      return;
+    }
+
+    // If currently connecting, wait for it
+    if (this.isConnecting) {
+      console.log("⏳ Connection already in progress, waiting...");
+      // Wait up to 10 seconds for connection to complete
+      for (let i = 0; i < 100; i++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        if ((mongoose.connection.readyState as number) === 1) {
+          return;
+        }
+      }
+      throw new Error("Connection timeout - another connection is in progress");
+    }
+
+    // If in a broken state (connecting/disconnecting), force cleanup
+    if (readyState === 2 || readyState === 3) {
+      console.log(`Mongoose in transitional state ${readyState}, cleaning up...`);
       try {
         await mongoose.disconnect();
-        // Wait a bit for the connection to fully close
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 500));
       } catch (err) {
-        console.log("Error disconnecting:", err);
+        console.log("Error during cleanup:", err);
       }
     }
+
+    this.isConnecting = true;
 
     try {
       const mongoUri = process.env.MONGODB_URI;
@@ -29,7 +51,7 @@ export class DatabaseService {
         throw new Error("MONGODB_URI environment variable is not set");
       }
 
-      console.log("Establishing new MongoDB connection...");
+      console.log("🔄 Establishing MongoDB connection...");
       await mongoose.connect(mongoUri, {
         maxPoolSize: 10,
         minPoolSize: 2,
@@ -40,8 +62,12 @@ export class DatabaseService {
         autoIndex: true,
       });
 
+      // Wait for connection pool to be ready
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       this.isConnected = true;
-      console.log("✅ Connected to MongoDB Atlas successfully");
+      this.isConnecting = false;
+      console.log("✅ MongoDB connected successfully");
 
       // Handle connection events (only set up once)
       if (!mongoose.connection.listeners("error").length) {
@@ -68,6 +94,7 @@ export class DatabaseService {
     } catch (error) {
       console.error("❌ Failed to connect to MongoDB:", error);
       this.isConnected = false;
+      this.isConnecting = false;
       throw error;
     }
   }
