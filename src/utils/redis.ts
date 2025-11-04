@@ -1,4 +1,4 @@
-import Redis from 'ioredis';
+import Redis from "ioredis";
 
 const redis = new Redis({
   retryStrategy: () => null, // Don't retry if Redis is unavailable

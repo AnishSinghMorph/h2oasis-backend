@@ -1,9 +1,9 @@
-import { Router } from 'express';
-import { 
+import { Router } from "express";
+import {
   handleRookHealthDataWebhook,
   handleRookNotificationWebhook,
-  webhookHealthCheck
-} from '../controllers/webhook.controller';
+  webhookHealthCheck,
+} from "../controllers/webhook.controller";
 
 const router = Router();
 
@@ -76,7 +76,7 @@ const router = Router();
  *       500:
  *         description: Internal server error
  */
-router.post('/health-data', handleRookHealthDataWebhook);
+router.post("/health-data", handleRookHealthDataWebhook);
 
 /**
  * @swagger
@@ -123,7 +123,7 @@ router.post('/health-data', handleRookHealthDataWebhook);
  *       500:
  *         description: Internal server error
  */
-router.post('/notifications', handleRookNotificationWebhook);
+router.post("/notifications", handleRookNotificationWebhook);
 
 /**
  * @swagger
@@ -152,6 +152,6 @@ router.post('/notifications', handleRookNotificationWebhook);
  *                 version:
  *                   type: string
  */
-router.get('/health', webhookHealthCheck);
+router.get("/health", webhookHealthCheck);
 
 export default router;

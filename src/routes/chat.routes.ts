@@ -1,5 +1,5 @@
-import { Router, Request, Response } from 'express';
-import { ChatController } from '../controllers/chat.controller';
+import { Router, Request, Response } from "express";
+import { ChatController } from "../controllers/chat.controller";
 
 const router = Router();
 const chatController = new ChatController();
@@ -53,7 +53,7 @@ const chatController = new ChatController();
  *       400:
  *         description: Invalid request
  */
-router.post('/message', async (req: Request, res: Response) => {
+router.post("/message", async (req: Request, res: Response) => {
   await chatController.sendMessage(req as any, res);
 });
 
@@ -86,8 +86,48 @@ router.post('/message', async (req: Request, res: Response) => {
  *       404:
  *         description: User not found
  */
-router.get('/health-context/:userId', async (req: Request, res: Response) => {
+router.get("/health-context/:userId", async (req: Request, res: Response) => {
   await chatController.getHealthContext(req, res);
+});
+
+/**
+ * @swagger
+ * /api/chat/generate-plan:
+ *   post:
+ *     summary: Generate personalized recovery plan
+ *     description: Creates a personalized recovery plan based on user's health data and selected product
+ *     tags: [Chat]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 description: Firebase UID
+ *               healthData:
+ *                 type: object
+ *               productContext:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: Recovery plan generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 plan:
+ *                   type: object
+ */
+router.post("/generate-plan", async (req: Request, res: Response) => {
+  await chatController.generatePlan(req, res);
 });
 
 /**
@@ -107,12 +147,12 @@ router.get('/health-context/:userId', async (req: Request, res: Response) => {
  *       200:
  *         description: Chat history (feature coming soon)
  */
-router.get('/history/:userId', async (req: Request, res: Response) => {
+router.get("/history/:userId", async (req: Request, res: Response) => {
   // TODO: Implement chat history retrieval
   res.json({
     success: true,
     history: [],
-    message: 'Chat history feature coming soon'
+    message: "Chat history feature coming soon",
   });
 });
 
@@ -133,11 +173,11 @@ router.get('/history/:userId', async (req: Request, res: Response) => {
  *       200:
  *         description: Chat history cleared
  */
-router.delete('/history/:userId', async (req: Request, res: Response) => {
+router.delete("/history/:userId", async (req: Request, res: Response) => {
   // TODO: Implement chat history clearing
   res.json({
     success: true,
-    message: 'Chat history cleared'
+    message: "Chat history cleared",
   });
 });
 

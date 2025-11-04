@@ -1,7 +1,7 @@
-import { Router } from 'express';
-import { TTSController } from '../controllers/tts.controller';
-import { verifyFirebaseToken } from '../middleware/auth.middleware';
-import { asyncHandler } from '../middleware/essential.middleware';
+import { Router } from "express";
+import { TTSController } from "../controllers/tts.controller";
+import { verifyFirebaseToken } from "../middleware/auth.middleware";
+import { asyncHandler } from "../middleware/essential.middleware";
 
 const router = Router();
 
@@ -34,7 +34,7 @@ const router = Router();
  *                       description:
  *                         type: string
  */
-router.get('/voices', asyncHandler(TTSController.getVoices));
+router.get("/voices", asyncHandler(TTSController.getVoices));
 
 /**
  * @swagger
@@ -64,7 +64,7 @@ router.get('/voices', asyncHandler(TTSController.getVoices));
  *                 audioUrl:
  *                   type: string
  */
-router.get('/preview/:voiceKey', asyncHandler(TTSController.previewVoice));
+router.get("/preview/:voiceKey", asyncHandler(TTSController.previewVoice));
 
 /**
  * @swagger
@@ -108,7 +108,11 @@ router.get('/preview/:voiceKey', asyncHandler(TTSController.previewVoice));
  *       401:
  *         description: Unauthorized
  */
-router.post('/synthesize', verifyFirebaseToken, asyncHandler(TTSController.textToSpeech));
+router.post(
+  "/synthesize",
+  verifyFirebaseToken,
+  asyncHandler(TTSController.textToSpeech),
+);
 
 /**
  * @swagger
@@ -135,6 +139,6 @@ router.post('/synthesize', verifyFirebaseToken, asyncHandler(TTSController.textT
  *       404:
  *         description: File not found
  */
-router.get('/audio/:fileName', asyncHandler(TTSController.serveAudio));
+router.get("/audio/:fileName", asyncHandler(TTSController.serveAudio));
 
 export default router;

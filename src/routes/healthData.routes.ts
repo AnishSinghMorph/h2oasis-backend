@@ -1,13 +1,13 @@
-import { Router } from 'express';
-import { 
-  getUnifiedHealthData, 
+import { Router } from "express";
+import {
+  getUnifiedHealthData,
   updateHealthDataPreferences,
   updateWearableConnection,
   getWearableConnections,
   syncRookConnections,
   // fetchRookHealthData, // DISABLED - using webhooks instead
-  getRookAuthURL
-} from '../controllers/healthData.controller';
+  getRookAuthURL,
+} from "../controllers/healthData.controller";
 
 const router = Router();
 
@@ -77,7 +77,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get('/', getUnifiedHealthData);
+router.get("/", getUnifiedHealthData);
 
 /**
  * @swagger
@@ -105,7 +105,7 @@ router.get('/', getUnifiedHealthData);
  *       401:
  *         description: Authentication required
  */
-router.get('/unified/:userId', getUnifiedHealthData);
+router.get("/unified/:userId", getUnifiedHealthData);
 
 /**
  * @swagger
@@ -137,7 +137,7 @@ router.get('/unified/:userId', getUnifiedHealthData);
  *       401:
  *         description: Authentication required
  */
-router.put('/preferences', updateHealthDataPreferences);
+router.put("/preferences", updateHealthDataPreferences);
 
 /**
  * @swagger
@@ -181,7 +181,7 @@ router.put('/preferences', updateHealthDataPreferences);
  *       401:
  *         description: Authentication required
  */
-router.post('/wearable-connection', updateWearableConnection);
+router.post("/wearable-connection", updateWearableConnection);
 
 /**
  * @swagger
@@ -198,7 +198,7 @@ router.post('/wearable-connection', updateWearableConnection);
  *       401:
  *         description: Authentication required
  */
-router.get('/wearable-connections', getWearableConnections);
+router.get("/wearable-connections", getWearableConnections);
 
 /**
  * @swagger
@@ -228,7 +228,7 @@ router.get('/wearable-connections', getWearableConnections);
  *       401:
  *         description: Authentication required
  */
-router.post('/sync-rook', syncRookConnections);
+router.post("/sync-rook", syncRookConnections);
 
 /**
  * @swagger
@@ -280,7 +280,7 @@ router.post('/sync-rook', syncRookConnections);
  *       401:
  *         description: Authentication required
  */
-router.post('/rook-auth-url', getRookAuthURL);
+router.post("/rook-auth-url", getRookAuthURL);
 
 /**
  * @swagger

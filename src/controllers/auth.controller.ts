@@ -1,13 +1,12 @@
-import { Request, Response } from 'express';
-import { DatabaseService } from '../utils/database';
-import { AuthService } from '../services/auth.service';
-import { User } from '../models/User.model';
-import { admin } from '../utils/firebase';
-import { AuthenticatedRequest } from '../middleware/auth.middleware';
-import redis from "../utils/redis"
+import { Request, Response } from "express";
+import { DatabaseService } from "../utils/database";
+import { AuthService } from "../services/auth.service";
+import { User } from "../models/User.model";
+import { admin } from "../utils/firebase";
+import { AuthenticatedRequest } from "../middleware/auth.middleware";
+import redis from "../utils/redis";
 
 export class AuthController {
-  
   static async register(req: Request, res: Response) {
     const { fullName, email, password } = req.body;
 
@@ -15,14 +14,14 @@ export class AuthController {
     if (!fullName || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Full name, email, and password are required'
+        message: "Full name, email, and password are required",
       });
     }
 
     if (password.length < 6) {
       return res.status(400).json({
         success: false,
-        message: 'Password must be at least 6 characters long'
+        message: "Password must be at least 6 characters long",
       });
     }
 
@@ -42,101 +41,103 @@ export class AuthController {
       email,
       fullName,
       displayName: fullName,
-      provider: 'password',
+      provider: "password",
     };
 
     const user = await AuthService.createOrUpdateUser(userData);
 
     return res.status(201).json({
       success: true,
-      message: 'User registered successfully',
+      message: "User registered successfully",
       user: {
         id: user._id,
         email: user.email,
         fullName: user.fullName,
         displayName: user.displayName,
+      },
+    });
+  }
+
+  static async login(req: Request, res: Response) {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required",
+      });
+    }
+
+    // Connect to database
+    await DatabaseService.connect();
+
+    const cacheKey = `user:${email.toLowerCase()}`;
+    const cachedUser = await redis.get(cacheKey);
+    let userDoc;
+    let userForResponse;
+
+    if (cachedUser) {
+      // Use cached user for response
+      userForResponse = JSON.parse(cachedUser);
+      // Fetch Mongoose doc for updating lastLoginAt
+      userDoc = await User.findOne({ email: email.toLowerCase() });
+    } else {
+      // Fetch from DB
+      userDoc = await User.findOne({ email: email.toLowerCase() });
+      if (userDoc) {
+        userForResponse = {
+          firebaseUid: userDoc.firebaseUid,
+          email: userDoc.email,
+          fullName: userDoc.fullName,
+          displayName: userDoc.displayName,
+          lastLoginAt: userDoc.lastLoginAt,
+          _id: userDoc._id,
+        };
+        await redis.set(cacheKey, JSON.stringify(userForResponse), "EX", 3600);
       }
-    });
-  }
+    }
 
-static async login(req: Request, res: Response) {
-  const { email, password } = req.body;
+    // If user not found in cache or DB
+    if (!userDoc) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
 
-  if (!email || !password) {
-    return res.status(400).json({
-      success: false,
-      message: 'Email and password are required'
-    });
-  }
+    // Create custom token that can be exchanged for ID token on client
+    const customToken = await admin
+      .auth()
+      .createCustomToken(userDoc.firebaseUid);
 
-  // Connect to database
-  await DatabaseService.connect();
+    // Update last login
+    userDoc.lastLoginAt = new Date();
+    await userDoc.save();
 
-  const cacheKey = `user:${email.toLowerCase()}`;
-  let cachedUser = await redis.get(cacheKey);
-  let userDoc;
-  let userForResponse;
-
-  if (cachedUser) {
-    // Use cached user for response
-    userForResponse = JSON.parse(cachedUser);
-    // Fetch Mongoose doc for updating lastLoginAt
-    userDoc = await User.findOne({ email: email.toLowerCase() });
-  } else {
-    // Fetch from DB
-    userDoc = await User.findOne({ email: email.toLowerCase() });
-    if (userDoc) {
-      userForResponse = {
-        firebaseUid: userDoc.firebaseUid,
+    // Always use userForResponse for the response
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      customToken: customToken,
+      firebaseUID: userDoc.firebaseUid,
+      user: {
+        id: userDoc._id,
         email: userDoc.email,
         fullName: userDoc.fullName,
         displayName: userDoc.displayName,
-        lastLoginAt: userDoc.lastLoginAt,
-        _id: userDoc._id
-      };
-      await redis.set(cacheKey, JSON.stringify(userForResponse), 'EX', 3600);
-    }
-  }
-
-  // If user not found in cache or DB
-  if (!userDoc) {
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid email or password'
+      },
     });
   }
 
-  // Create custom token that can be exchanged for ID token on client
-  const customToken = await admin.auth().createCustomToken(userDoc.firebaseUid);
-
-  // Update last login
-  userDoc.lastLoginAt = new Date();
-  await userDoc.save();
-
-  // Always use userForResponse for the response
-  return res.status(200).json({
-    success: true,
-    message: 'Login successful',
-    customToken: customToken,
-    firebaseUID: userDoc.firebaseUid,
-    user: {
-      id: userDoc._id,
-      email: userDoc.email,
-      fullName: userDoc.fullName,
-      displayName: userDoc.displayName,
-    }
-  });
-}
-
   static async getProfile(req: AuthenticatedRequest, res: Response) {
     await DatabaseService.connect();
-    
+
     const user = await AuthService.getUserByFirebaseUid(req.user!.uid);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: "User not found",
       });
     }
 
@@ -150,7 +151,7 @@ static async login(req: Request, res: Response) {
         isEmailVerified: user.isEmailVerified,
         profileCompleted: user.profileCompleted,
         onboardingCompleted: user.onboardingCompleted,
-      }
+      },
     });
   }
 
@@ -158,27 +159,27 @@ static async login(req: Request, res: Response) {
     const userId = req.user!.uid;
 
     await DatabaseService.connect();
-    
+
     const user = await User.findOneAndUpdate(
-      { firebaseUid: userId }, 
+      { firebaseUid: userId },
       { onboardingCompleted: true },
-      { new: true }
+      { new: true },
     );
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: "User not found",
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: 'Onboarding completed successfully',
+      message: "Onboarding completed successfully",
       user: {
         id: user._id,
         onboardingCompleted: user.onboardingCompleted,
-      }
+      },
     });
   }
 }

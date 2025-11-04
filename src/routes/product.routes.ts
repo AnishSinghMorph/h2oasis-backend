@@ -1,7 +1,7 @@
-import { Router } from 'express';
-import { ProductController } from '../controllers/product.controller';
-import { verifyFirebaseToken } from '../middleware/auth.middleware';
-import { asyncHandler } from '../middleware/essential.middleware';
+import { Router } from "express";
+import { ProductController } from "../controllers/product.controller";
+import { verifyFirebaseToken } from "../middleware/auth.middleware";
+import { asyncHandler } from "../middleware/essential.middleware";
 
 const router = Router();
 
@@ -37,7 +37,7 @@ const router = Router();
  *                         type: string
  *                         example: cold-plunge
  */
-router.get('/', asyncHandler(ProductController.getAllProducts));
+router.get("/", asyncHandler(ProductController.getAllProducts));
 
 /**
  * @swagger
@@ -54,7 +54,11 @@ router.get('/', asyncHandler(ProductController.getAllProducts));
  *       401:
  *         description: Unauthorized
  */
-router.get('/my-selection', verifyFirebaseToken, asyncHandler(ProductController.getUserSelection));
+router.get(
+  "/my-selection",
+  verifyFirebaseToken,
+  asyncHandler(ProductController.getUserSelection),
+);
 
 /**
  * @swagger
@@ -84,7 +88,11 @@ router.get('/my-selection', verifyFirebaseToken, asyncHandler(ProductController.
  *       401:
  *         description: Unauthorized
  */
-router.post('/select', verifyFirebaseToken, asyncHandler(ProductController.selectProduct));
+router.post(
+  "/select",
+  verifyFirebaseToken,
+  asyncHandler(ProductController.selectProduct),
+);
 
 /**
  * @swagger
@@ -101,6 +109,10 @@ router.post('/select', verifyFirebaseToken, asyncHandler(ProductController.selec
  *       401:
  *         description: Unauthorized
  */
-router.delete('/unselect', verifyFirebaseToken, asyncHandler(ProductController.unselectProduct));
+router.delete(
+  "/unselect",
+  verifyFirebaseToken,
+  asyncHandler(ProductController.unselectProduct),
+);
 
 export default router;

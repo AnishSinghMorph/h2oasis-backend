@@ -1,6 +1,6 @@
-import { Router } from 'express';
-import { HealthController } from '../controllers/health.controller';
-import { asyncHandler } from '../middleware/essential.middleware';
+import { Router } from "express";
+import { HealthController } from "../controllers/health.controller";
+import { asyncHandler } from "../middleware/essential.middleware";
 
 const router = Router();
 
@@ -32,7 +32,7 @@ const router = Router();
  *                   type: number
  *                   description: Server uptime in seconds
  */
-router.get('/', asyncHandler(HealthController.healthCheck));
+router.get("/", asyncHandler(HealthController.healthCheck));
 
 /**
  * @swagger
@@ -66,6 +66,6 @@ router.get('/', asyncHandler(HealthController.healthCheck));
  *       500:
  *         description: Database connection failed
  */
-router.get('/database', asyncHandler(HealthController.testDatabase));
+router.get("/database", asyncHandler(HealthController.testDatabase));
 
 export default router;
