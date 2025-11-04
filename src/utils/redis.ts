@@ -1,23 +1,20 @@
-import Redis from "ioredis";
+/**
+ * Redis Mock - Temporarily disabled
+ * Redis is not available on AWS right now, so we're using a mock that does nothing
+ * Caching is completely disabled until Redis is set up
+ */
 
-const redis = new Redis({
-  retryStrategy: () => null, // Don't retry if Redis is unavailable
-  maxRetriesPerRequest: 1,
-  enableReadyCheck: false,
-  lazyConnect: true,
-});
+console.log('⚠️ Redis disabled - no caching (this is temporary)');
 
-// Handle connection errors gracefully
-redis.on('error', (err: any) => {
-  // Silently ignore Redis connection errors (Redis is optional for caching)
-  if (err.code !== 'ECONNREFUSED') {
-    console.warn('Redis connection warning:', err.message);
-  }
-});
+// Mock Redis client that accepts all parameters but does nothing
+const mockRedis = {
+  get: async (key: string) => null,
+  set: async (key: string, value: string, ...args: any[]) => 'OK',
+  del: async (key: string) => 1,
+  expire: async (key: string, seconds: number) => 1,
+  on: (event: string, handler: any) => {},
+  connect: async () => {},
+  disconnect: async () => {},
+};
 
-// Try to connect, but don't fail if Redis is unavailable
-redis.connect().catch(() => {
-  console.log('Redis not available - caching disabled (this is optional)');
-});
-
-export default redis;
+export default mockRedis;
