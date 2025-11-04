@@ -23,12 +23,15 @@ export class RookWebhookService {
     notificationWebhook: string;
     healthCheck: string;
   } {
-    const baseUrl = process.env.WEBHOOK_BASE_URL || process.env.BASE_URL || 'https://your-domain.com';
-    
+    const baseUrl =
+      process.env.WEBHOOK_BASE_URL ||
+      process.env.BASE_URL ||
+      "https://your-domain.com";
+
     return {
       healthDataWebhook: `${baseUrl}/api/webhooks/rook/health-data`,
       notificationWebhook: `${baseUrl}/api/webhooks/rook/notifications`,
-      healthCheck: `${baseUrl}/api/webhooks/rook/health`
+      healthCheck: `${baseUrl}/api/webhooks/rook/health`,
     };
   }
 
@@ -45,32 +48,34 @@ export class RookWebhookService {
 
     // Check required environment variables
     if (!process.env.ROOK_WEBHOOK_SECRET_KEY) {
-      missing.push('ROOK_WEBHOOK_SECRET_KEY');
+      missing.push("ROOK_WEBHOOK_SECRET_KEY");
     }
 
     if (!process.env.WEBHOOK_BASE_URL && !process.env.BASE_URL) {
-      missing.push('WEBHOOK_BASE_URL or BASE_URL');
+      missing.push("WEBHOOK_BASE_URL or BASE_URL");
     }
 
     // Check ROOK configuration
     if (!process.env.ROOK_SANDBOX_CLIENT_UUID) {
-      warnings.push('ROOK_SANDBOX_CLIENT_UUID not set');
+      warnings.push("ROOK_SANDBOX_CLIENT_UUID not set");
     }
 
     if (!process.env.ROOK_SANDBOX_SECRET_KEY) {
-      warnings.push('ROOK_SANDBOX_SECRET_KEY not set');
+      warnings.push("ROOK_SANDBOX_SECRET_KEY not set");
     }
 
     // Check if using localhost (not suitable for production webhooks)
     const baseUrl = process.env.WEBHOOK_BASE_URL || process.env.BASE_URL;
-    if (baseUrl?.includes('localhost') || baseUrl?.includes('127.0.0.1')) {
-      warnings.push('Webhook URL uses localhost - ROOK cannot reach local URLs. Use ngrok or deploy to production.');
+    if (baseUrl?.includes("localhost") || baseUrl?.includes("127.0.0.1")) {
+      warnings.push(
+        "Webhook URL uses localhost - ROOK cannot reach local URLs. Use ngrok or deploy to production.",
+      );
     }
 
     return {
       isValid: missing.length === 0,
       missing,
-      warnings
+      warnings,
     };
   }
 
@@ -81,27 +86,30 @@ export class RookWebhookService {
     const validation = this.validateConfiguration();
     const urls = this.getWebhookUrls();
 
-    console.log('\n🔗 ROOK Webhook Configuration:');
-    console.log('================================');
-    
+    console.log("\n🔗 ROOK Webhook Configuration:");
+    console.log("================================");
+
     if (validation.isValid) {
-      console.log('✅ Configuration is valid');
+      console.log("✅ Configuration is valid");
     } else {
-      console.log('❌ Configuration has issues');
+      console.log("❌ Configuration has issues");
       if (validation.missing.length > 0) {
-        console.log('Missing required variables:', validation.missing.join(', '));
+        console.log(
+          "Missing required variables:",
+          validation.missing.join(", "),
+        );
       }
     }
 
     if (validation.warnings.length > 0) {
-      console.log('⚠️ Warnings:', validation.warnings.join(', '));
+      console.log("⚠️ Warnings:", validation.warnings.join(", "));
     }
 
-    console.log('\n📍 Webhook URLs to configure in ROOK Portal:');
-    console.log('Health Data Webhook:', urls.healthDataWebhook);
-    console.log('Notification Webhook:', urls.notificationWebhook);
-    console.log('Health Check:', urls.healthCheck);
-    console.log('================================\n');
+    console.log("\n📍 Webhook URLs to configure in ROOK Portal:");
+    console.log("Health Data Webhook:", urls.healthDataWebhook);
+    console.log("Notification Webhook:", urls.notificationWebhook);
+    console.log("Health Check:", urls.healthCheck);
+    console.log("================================\n");
   }
 }
 

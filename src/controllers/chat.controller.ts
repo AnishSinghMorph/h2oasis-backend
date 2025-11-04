@@ -1,5 +1,5 @@
-import { Request, Response } from 'express';
-import { OpenAIService } from '../services/openai.service';
+import { Request, Response } from "express";
+import { OpenAIService } from "../services/openai.service";
 
 export class ChatController {
   private openAIService: OpenAIService;
@@ -10,28 +10,29 @@ export class ChatController {
 
   sendMessage = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { message, userId, healthData, productContext, chatHistory } = req.body;
+      const { message, userId, healthData, productContext, chatHistory } =
+        req.body;
 
       // Validate required fields
       if (!message || !userId) {
         res.status(400).json({
-          error: 'Message and userId are required'
+          error: "Message and userId are required",
         });
         return;
       }
 
       // Default product context if not provided
       const defaultProductContext = {
-        productName: 'H2Oasis Recovery System',
-        productType: 'recovery_suite' as const,
-        features: ['Cold Plunge', 'Hot Tub', 'Sauna']
+        productName: "H2Oasis Recovery System",
+        productType: "recovery_suite" as const,
+        features: ["Cold Plunge", "Hot Tub", "Sauna"],
       };
 
       // Convert chat history timestamps
       const formattedChatHistory = chatHistory?.map((msg: any) => ({
         role: msg.role,
         content: msg.content,
-        timestamp: new Date(msg.timestamp)
+        timestamp: new Date(msg.timestamp),
       }));
 
       // Build context for OpenAI
@@ -40,15 +41,17 @@ export class ChatController {
         productContext: productContext || defaultProductContext,
         userMessage: message,
         chatHistory: formattedChatHistory,
-        userId
+        userId,
       };
 
       // Generate AI response
       const aiResponse = await this.openAIService.generateResponse(context);
 
       // Check if response contains action marker
-      const hasAction = aiResponse.includes('[ACTION:CREATE_PLAN]');
-      const cleanResponse = aiResponse.replace('[ACTION:CREATE_PLAN]', '').trim();
+      const hasAction = aiResponse.includes("[ACTION:CREATE_PLAN]");
+      const cleanResponse = aiResponse
+        .replace("[ACTION:CREATE_PLAN]", "")
+        .trim();
 
       // Save chat message to database (implement this later)
       // await this.saveChatMessage(userId, message, aiResponse);
@@ -57,18 +60,18 @@ export class ChatController {
         success: true,
         response: cleanResponse,
         timestamp: new Date().toISOString(),
-        action: hasAction ? 'CREATE_PLAN' : null,
+        action: hasAction ? "CREATE_PLAN" : null,
         context: {
           healthDataReceived: !!healthData,
-          productContext: context.productContext
-        }
+          productContext: context.productContext,
+        },
       });
-
     } catch (error) {
-      console.error('Chat controller error:', error);
+      console.error("Chat controller error:", error);
       res.status(500).json({
-        error: 'Failed to process chat message',
-        message: 'I apologize, but I\'m experiencing technical difficulties. Please try again in a moment.'
+        error: "Failed to process chat message",
+        message:
+          "I apologize, but I'm experiencing technical difficulties. Please try again in a moment.",
       });
     }
   };
@@ -79,7 +82,7 @@ export class ChatController {
 
       if (!userId) {
         res.status(400).json({
-          error: 'userId is required'
+          error: "userId is required",
         });
         return;
       }
@@ -96,27 +99,32 @@ export class ChatController {
         hrv: 42,
         stressLevel: 3,
         bloodOxygen: 98,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
       };
 
       res.json({
         success: true,
         healthData: mockHealthData,
-        userId
+        userId,
       });
-
     } catch (error) {
-      console.error('Health context error:', error);
+      console.error("Health context error:", error);
       res.status(500).json({
-        error: 'Failed to fetch health context'
+        error: "Failed to fetch health context",
       });
     }
   };
 
   // Future method to save chat history
-  private async saveChatMessage(userId: string, userMessage: string, aiResponse: string): Promise<void> {
+  private async saveChatMessage(
+    userId: string,
+    userMessage: string,
+    aiResponse: string,
+  ): Promise<void> {
     // TODO: Implement database storage for chat history
-    console.log(`Saving chat for user ${userId}: ${userMessage} -> ${aiResponse}`);
+    console.log(
+      `Saving chat for user ${userId}: ${userMessage} -> ${aiResponse}`,
+    );
   }
 
   generatePlan = async (req: Request, res: Response): Promise<void> => {
@@ -125,44 +133,44 @@ export class ChatController {
 
       if (!userId) {
         res.status(400).json({
-          error: 'userId is required'
+          error: "userId is required",
         });
         return;
       }
 
-      console.log('📋 Generating recovery plan for user:', userId);
+      console.log("📋 Generating recovery plan for user:", userId);
 
       // Default product context if not provided
       const defaultProductContext = {
-        productName: 'H2Oasis Recovery System',
-        productType: 'recovery_suite' as const,
-        features: ['Cold Plunge', 'Hot Tub', 'Sauna']
+        productName: "H2Oasis Recovery System",
+        productType: "recovery_suite" as const,
+        features: ["Cold Plunge", "Hot Tub", "Sauna"],
       };
 
       // Build context for plan generation
       const context = {
         healthData: healthData || {},
         productContext: productContext || defaultProductContext,
-        userMessage: 'Generate my recovery plan',
-        userId
+        userMessage: "Generate my recovery plan",
+        userId,
       };
 
       // Generate personalized recovery plan
-      const recoveryPlan = await this.openAIService.generateRecoveryPlan(context);
+      const recoveryPlan =
+        await this.openAIService.generateRecoveryPlan(context);
 
-      console.log('✅ Recovery plan generated');
+      console.log("✅ Recovery plan generated");
 
       res.json({
         success: true,
         plan: recoveryPlan,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
-
     } catch (error) {
-      console.error('Plan generation error:', error);
+      console.error("Plan generation error:", error);
       res.status(500).json({
-        error: 'Failed to generate recovery plan',
-        message: 'Unable to create plan. Please try again.'
+        error: "Failed to generate recovery plan",
+        message: "Unable to create plan. Please try again.",
       });
     }
   };

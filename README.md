@@ -28,6 +28,7 @@ src/
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Node.js 18+
 - Firebase CLI
 - MongoDB Atlas account
@@ -35,23 +36,27 @@ src/
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/AnishSinghMorph/h2oasis-backend.git
    cd h2oasis-backend
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Environment Setup**
+
    ```bash
    cp .env.example .env
    # Fill in your Firebase and MongoDB credentials
    ```
 
 4. **Build the project**
+
    ```bash
    npm run build
    ```
@@ -64,12 +69,14 @@ src/
 ## 📡 API Endpoints
 
 ### Authentication
+
 - `POST /auth/create-user` - Create new user
 - `POST /auth/login` - Email/password login
 - `POST /auth/google-signin` - Google OAuth login
 - `GET /auth/profile` - Get user profile (protected)
 
 ### Health Check
+
 - `GET /health` - System health status
 
 ## 🔧 Development
@@ -98,10 +105,12 @@ NODE_ENV=development
 ## 🚀 Deployment
 
 ### Automatic Deployment
+
 - **Main Branch**: Automatically deploys to production via GitHub Actions
 - **Develop Branch**: Runs validation and testing
 
 ### Manual Deployment
+
 ```bash
 npm run deploy
 ```
@@ -139,4 +148,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [GitHub Actions](https://github.com/AnishSinghMorph/h2oasis-backend/actions)
 
 ---
-

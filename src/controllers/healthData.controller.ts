@@ -1,14 +1,17 @@
-import { Request, Response } from 'express';
-import { User } from '../models/User.model';
-import { UserSelection } from '../models/UserSelection.model';
-import { Product } from '../models/Product.model';
-import { getUserConnections, getAllHealthDataForSource } from '../services/rook.service';
-import { IHealthData } from '../models/HealthData.types';
+import { Request, Response } from "express";
+import { User } from "../models/User.model";
+import { UserSelection } from "../models/UserSelection.model";
+import { Product } from "../models/Product.model";
+import {
+  getUserConnections,
+  getAllHealthDataForSource,
+} from "../services/rook.service";
+import { IHealthData } from "../models/HealthData.types";
 
 interface WearableData {
   id: string;
   name: string;
-  type: 'api' | 'sdk';
+  type: "api" | "sdk";
   connected: boolean;
   lastSync?: string;
   data?: IHealthData | null;
@@ -41,32 +44,36 @@ interface UnifiedHealthData {
   lastSync: string;
 }
 
-export const getUnifiedHealthData = async (req: Request, res: Response): Promise<void> => {
+export const getUnifiedHealthData = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
-    const userId = req.headers['x-firebase-uid'] as string;
-    
+    const userId = req.headers["x-firebase-uid"] as string;
+
     if (!userId) {
-      res.status(401).json({ 
-        success: false, 
-        error: 'Authentication required' 
+      res.status(401).json({
+        success: false,
+        error: "Authentication required",
       });
       return;
     }
 
-    console.log('📊 Fetching unified health data for user:', userId);
+    console.log("📊 Fetching unified health data for user:", userId);
 
     // Get user profile
     const user = await User.findOne({ firebaseUid: userId });
-    
+
     // Get user's product selection
-    const userSelection = await UserSelection.findOne({ userId })
-      .populate('productId') as any;
+    const userSelection = (await UserSelection.findOne({ userId }).populate(
+      "productId",
+    )) as any;
 
     // Get user's wearable connection statuses from database
-    const wearableConnections = user?.wearableConnections || {};
-    
-    console.log('🔍 Wearable connections data:', JSON.stringify(wearableConnections, null, 2));
-    
+    const wearables = user?.wearables || {};
+
+    console.log("🔍 Wearables data:", JSON.stringify(wearables, null, 2));
+
     // Build unified data with actual health data from connected wearables
     const unifiedData: UnifiedHealthData = {
       userId,
@@ -75,151 +82,161 @@ export const getUnifiedHealthData = async (req: Request, res: Response): Promise
         email: user?.email,
         uid: userId,
       },
-      selectedProduct: userSelection ? {
-        id: userSelection.productId._id.toString(),
-        name: userSelection.productId.name,
-        type: userSelection.productId.type,
-        selectedAt: userSelection.selectedAt.toISOString(),
-      } : null,
+      selectedProduct: userSelection
+        ? {
+            id: userSelection.productId._id.toString(),
+            name: userSelection.productId.name,
+            type: userSelection.productId.type,
+            selectedAt: userSelection.selectedAt.toISOString(),
+          }
+        : null,
       wearables: {
         apple: {
-          id: 'apple',
-          name: 'Apple Health',
-          type: 'sdk',
-          connected: wearableConnections.apple?.connected || false,
-          lastSync: wearableConnections.apple?.lastSync?.toISOString(),
-          data: wearableConnections.apple?.healthData || null
+          id: "apple",
+          name: "Apple Health",
+          type: "sdk",
+          connected: wearables.apple?.connected || false,
+          lastSync: wearables.apple?.lastSync?.toISOString(),
+          data: wearables.apple?.data || null,
         },
         samsung: {
-          id: 'samsung',
-          name: 'Samsung Health',
-          type: 'sdk',
-          connected: wearableConnections.samsung?.connected || false,
-          lastSync: wearableConnections.samsung?.lastSync?.toISOString(),
-          data: wearableConnections.samsung?.healthData || null
+          id: "samsung",
+          name: "Samsung Health",
+          type: "sdk",
+          connected: wearables.samsung?.connected || false,
+          lastSync: wearables.samsung?.lastSync?.toISOString(),
+          data: wearables.samsung?.data || null,
         },
         garmin: {
-          id: 'garmin',
-          name: 'Garmin',
-          type: 'api',
-          connected: wearableConnections.garmin?.connected || false,
-          lastSync: wearableConnections.garmin?.lastSync?.toISOString(),
-          data: wearableConnections.garmin?.healthData || null
+          id: "garmin",
+          name: "Garmin",
+          type: "api",
+          connected: wearables.garmin?.connected || false,
+          lastSync: wearables.garmin?.lastSync?.toISOString(),
+          data: wearables.garmin?.data || null,
         },
         fitbit: {
-          id: 'fitbit',
-          name: 'Fitbit',
-          type: 'api',
-          connected: wearableConnections.fitbit?.connected || false,
-          lastSync: wearableConnections.fitbit?.lastSync?.toISOString(),
-          data: wearableConnections.fitbit?.healthData || null
+          id: "fitbit",
+          name: "Fitbit",
+          type: "api",
+          connected: wearables.fitbit?.connected || false,
+          lastSync: wearables.fitbit?.lastSync?.toISOString(),
+          data: wearables.fitbit?.data || null,
         },
         whoop: {
-          id: 'whoop',
-          name: 'Whoop',
-          type: 'api',
-          connected: wearableConnections.whoop?.connected || false,
-          lastSync: wearableConnections.whoop?.lastSync?.toISOString(),
-          data: wearableConnections.whoop?.healthData || null
+          id: "whoop",
+          name: "Whoop",
+          type: "api",
+          connected: wearables.whoop?.connected || false,
+          lastSync: wearables.whoop?.lastSync?.toISOString(),
+          data: wearables.whoop?.data || null,
         },
         oura: {
-          id: 'oura',
-          name: 'Oura Ring',
-          type: 'api',
-          connected: wearableConnections.oura?.connected || false,
-          lastSync: wearableConnections.oura?.lastSync?.toISOString(),
-          data: wearableConnections.oura?.healthData || null
-        }
+          id: "oura",
+          name: "Oura Ring",
+          type: "api",
+          connected: wearables.oura?.connected || false,
+          lastSync: wearables.oura?.lastSync?.toISOString(),
+          data: wearables.oura?.data || null,
+        },
       },
       lastSync: new Date().toISOString(),
     };
 
-    console.log('✅ Unified health data prepared');
+    console.log("✅ Unified health data prepared");
 
     res.json({
       success: true,
       data: unifiedData,
     });
-
   } catch (error) {
-    console.error('❌ Error fetching unified health data:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch health data' 
+    console.error("❌ Error fetching unified health data:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch health data",
     });
   }
 };
 
-export const updateHealthDataPreferences = async (req: Request, res: Response): Promise<void> => {
+export const updateHealthDataPreferences = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
-    const userId = req.headers['x-firebase-uid'] as string;
+    const userId = req.headers["x-firebase-uid"] as string;
     const { voiceId, voiceName, units, timezone } = req.body;
-    
+
     if (!userId) {
-      res.status(401).json({ 
-        success: false, 
-        error: 'Authentication required' 
+      res.status(401).json({
+        success: false,
+        error: "Authentication required",
       });
       return;
     }
 
-    console.log('⚙️ Updating health data preferences for user:', userId);
+    console.log("⚙️ Updating health data preferences for user:", userId);
 
     // Update user preferences in database
     await User.findOneAndUpdate(
       { uid: userId },
       {
         $set: {
-          'preferences.voiceId': voiceId,
-          'preferences.voiceName': voiceName,
-          'preferences.units': units,
-          'preferences.timezone': timezone,
+          "preferences.voiceId": voiceId,
+          "preferences.voiceName": voiceName,
+          "preferences.units": units,
+          "preferences.timezone": timezone,
           updatedAt: new Date(),
-        }
+        },
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
 
-    console.log('✅ Health data preferences updated');
+    console.log("✅ Health data preferences updated");
 
     res.json({
       success: true,
-      message: 'Preferences updated successfully',
+      message: "Preferences updated successfully",
     });
-
   } catch (error) {
-    console.error('❌ Error updating preferences:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to update preferences' 
+    console.error("❌ Error updating preferences:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to update preferences",
     });
   }
 };
 
-export const updateWearableConnection = async (req: Request, res: Response): Promise<void> => {
+export const updateWearableConnection = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
-    const userId = req.headers['x-firebase-uid'] as string;
-    const { wearableId, wearableName, dataSource, connected, healthData } = req.body;
-    
+    const userId = req.headers["x-firebase-uid"] as string;
+    const { wearableId, wearableName, dataSource, connected, healthData } =
+      req.body;
+
     if (!userId) {
-      res.status(401).json({ 
-        success: false, 
-        error: 'Authentication required' 
+      res.status(401).json({
+        success: false,
+        error: "Authentication required",
       });
       return;
     }
 
-    console.log(`📱 Updating ${wearableName} connection status:`, { wearableId, connected });
+    console.log(`📱 Updating ${wearableName} connection status:`, {
+      wearableId,
+      connected,
+    });
     if (healthData) {
       console.log(`📊 Including health data for ${wearableName}:`, healthData);
     }
 
     // Update user's wearable connection status and health data
-    const updateField = `wearableConnections.${wearableId}`;
+    const updateField = `wearables.${wearableId}`;
     const connectionData: any = {
       id: wearableId,
       name: wearableName,
-      dataSource: dataSource || wearableId,
+      type: dataSource === "sdk" ? "sdk" : "api",
       connected: connected,
       lastSync: new Date(),
       connectedAt: connected ? new Date() : null,
@@ -227,7 +244,7 @@ export const updateWearableConnection = async (req: Request, res: Response): Pro
 
     // Include health data if provided
     if (healthData) {
-      connectionData.healthData = healthData;
+      connectionData.data = healthData;
     }
 
     await User.findOneAndUpdate(
@@ -236,12 +253,14 @@ export const updateWearableConnection = async (req: Request, res: Response): Pro
         $set: {
           [updateField]: connectionData,
           updatedAt: new Date(),
-        }
+        },
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
 
-    console.log(`✅ ${wearableName} connection status updated: ${connected ? 'Connected' : 'Disconnected'}`);
+    console.log(
+      `✅ ${wearableName} connection status updated: ${connected ? "Connected" : "Disconnected"}`,
+    );
     if (healthData) {
       console.log(`✅ ${wearableName} health data saved successfully`);
     }
@@ -254,88 +273,97 @@ export const updateWearableConnection = async (req: Request, res: Response): Pro
         connected,
         lastSync: new Date().toISOString(),
         hasHealthData: !!healthData,
-      }
+      },
     });
-
   } catch (error) {
-    console.error('❌ Error updating wearable connection:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to update wearable connection status' 
+    console.error("❌ Error updating wearable connection:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to update wearable connection status",
     });
   }
 };
 
-export const getWearableConnections = async (req: Request, res: Response): Promise<void> => {
+export const getWearableConnections = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
-    const userId = req.headers['x-firebase-uid'] as string;
-    
+    const userId = req.headers["x-firebase-uid"] as string;
+
     if (!userId) {
-      res.status(401).json({ 
-        success: false, 
-        error: 'Authentication required' 
+      res.status(401).json({
+        success: false,
+        error: "Authentication required",
       });
       return;
     }
 
-    console.log('🔍 Fetching wearable connections for user:', userId);
+    console.log("🔍 Fetching wearable connections for user:", userId);
 
     // Get user's wearable connections
     const user = await User.findOne({ firebaseUid: userId });
-    const wearableConnections = user?.wearableConnections || {};
+    const wearables = user?.wearables || {};
 
-    console.log('📊 Wearable connections found:', wearableConnections);
+    console.log("📊 Wearables found:", wearables);
 
     res.json({
       success: true,
-      data: wearableConnections,
+      data: wearables,
     });
-
   } catch (error) {
-    console.error('❌ Error fetching wearable connections:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch wearable connections' 
+    console.error("❌ Error fetching wearable connections:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch wearable connections",
     });
   }
 };
 
-export const syncRookConnections = async (req: Request, res: Response): Promise<void> => {
+export const syncRookConnections = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
-    const userId = req.headers['x-firebase-uid'] as string;
+    const userId = req.headers["x-firebase-uid"] as string;
     const { mongoUserId } = req.body; // The MongoDB user ID used in ROOK
-    
+
     if (!userId) {
-      res.status(401).json({ 
-        success: false, 
-        error: 'Authentication required' 
+      res.status(401).json({
+        success: false,
+        error: "Authentication required",
       });
       return;
     }
 
-    console.log(`🔄 Syncing ROOK connections for user: ${userId}, ROOK User ID: ${mongoUserId}`);
+    console.log(
+      `🔄 Syncing ROOK connections for user: ${userId}, ROOK User ID: ${mongoUserId}`,
+    );
 
     // Fetch connections from ROOK API
     const rookConnections = await getUserConnections(mongoUserId);
-    
-    console.log('📡 ROOK API response:', JSON.stringify(rookConnections, null, 2));
+
+    console.log(
+      "📡 ROOK API response:",
+      JSON.stringify(rookConnections, null, 2),
+    );
 
     // Map ROOK data sources to our wearable names
     const dataSourceMap: { [key: string]: string } = {
-      'oura': 'oura',
-      'garmin': 'garmin',
-      'fitbit': 'fitbit',
-      'whoop': 'whoop',
-      'apple_health': 'apple',
+      oura: "oura",
+      garmin: "garmin",
+      fitbit: "fitbit",
+      whoop: "whoop",
+      apple_health: "apple",
     };
 
     // Update our database with ROOK connection statuses
     const user = await User.findOne({ firebaseUid: userId });
-    
+
     if (!user) {
       res.status(404).json({
         success: false,
-        error: 'User not found'
+        error: "User not found",
       });
       return;
     }
@@ -343,84 +371,95 @@ export const syncRookConnections = async (req: Request, res: Response): Promise<
     // Update each wearable connection status
     for (const [rookSource, ourWearable] of Object.entries(dataSourceMap)) {
       const rookConnection = rookConnections.connections?.[rookSource];
-      
+
       if (rookConnection) {
-        const updateField = `wearableConnections.${ourWearable}`;
-        
+        const updateField = `wearables.${ourWearable}`;
+
         await User.findOneAndUpdate(
           { firebaseUid: userId },
           {
             $set: {
               [updateField]: {
                 id: ourWearable,
-                name: ourWearable.charAt(0).toUpperCase() + ourWearable.slice(1),
-                dataSource: rookSource,
+                name:
+                  ourWearable.charAt(0).toUpperCase() + ourWearable.slice(1),
+                type: "api",
                 connected: rookConnection.connected,
                 lastSync: rookConnection.lastSync || new Date(),
                 connectedAt: rookConnection.connected ? new Date() : null,
               },
               updatedAt: new Date(),
-            }
+            },
           },
-          { new: true }
+          { new: true },
         );
 
-        console.log(`✅ Updated ${ourWearable} connection status: ${rookConnection.connected}`);
+        console.log(
+          `✅ Updated ${ourWearable} connection status: ${rookConnection.connected}`,
+        );
 
         // If connected, try to fetch recent health data
         if (rookConnection.connected) {
           try {
-            const healthData = await getAllHealthDataForSource(mongoUserId, rookSource);
-            
+            const healthData = await getAllHealthDataForSource(
+              mongoUserId,
+              rookSource,
+            );
+
             // Update health data if available
             await User.findOneAndUpdate(
               { firebaseUid: userId },
               {
                 $set: {
-                  [`wearableConnections.${ourWearable}.healthData`]: {
+                  [`wearables.${ourWearable}.data`]: {
                     ...healthData,
                     lastFetched: new Date(),
-                  }
-                }
-              }
+                  },
+                },
+              },
             );
-            
+
             console.log(`✅ Fetched and stored health data for ${ourWearable}`);
           } catch (error) {
-            console.log(`⚠️ Could not fetch health data for ${ourWearable}:`, error);
+            console.log(
+              `⚠️ Could not fetch health data for ${ourWearable}:`,
+              error,
+            );
           }
         }
       }
     }
 
-    console.log('✅ ROOK connections synced successfully');
+    console.log("✅ ROOK connections synced successfully");
 
     res.json({
       success: true,
-      message: 'ROOK connections synced successfully',
+      message: "ROOK connections synced successfully",
       data: rookConnections,
     });
-
   } catch (error: any) {
-    console.error('❌ Error syncing ROOK connections:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message || 'Failed to sync ROOK connections' 
+    console.error("❌ Error syncing ROOK connections:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to sync ROOK connections",
     });
   }
 };
 
 // COMMENTED OUT: Manual API fetching to avoid confusion with webhook data
 // Use webhooks for real-time data delivery instead
-export const fetchRookHealthData_DISABLED = async (req: Request, res: Response): Promise<void> => {
+export const fetchRookHealthData_DISABLED = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
-    const userId = req.headers['x-firebase-uid'] as string;
+    const userId = req.headers["x-firebase-uid"] as string;
     const { mongoUserId, dataSource, date } = req.body;
-    
+
     if (!userId) {
-      res.status(401).json({ 
-        success: false, 
-        error: 'Authentication required' 
+      res.status(401).json({
+        success: false,
+        error: "Authentication required",
       });
       return;
     }
@@ -428,7 +467,7 @@ export const fetchRookHealthData_DISABLED = async (req: Request, res: Response):
     if (!mongoUserId || !dataSource) {
       res.status(400).json({
         success: false,
-        error: 'mongoUserId and dataSource are required'
+        error: "mongoUserId and dataSource are required",
       });
       return;
     }
@@ -436,34 +475,38 @@ export const fetchRookHealthData_DISABLED = async (req: Request, res: Response):
     console.log(`📊 Fetching ROOK health data for ${dataSource}...`);
 
     // Fetch all health data from ROOK
-    const healthData = await getAllHealthDataForSource(mongoUserId, dataSource, date);
+    const healthData = await getAllHealthDataForSource(
+      mongoUserId,
+      dataSource,
+      date,
+    );
 
     // Update user's wearable health data in database
     const wearableMap: { [key: string]: string } = {
-      'oura': 'oura',
-      'garmin': 'garmin',
-      'fitbit': 'fitbit',
-      'whoop': 'whoop',
-      'apple_health': 'apple',
+      oura: "oura",
+      garmin: "garmin",
+      fitbit: "fitbit",
+      whoop: "whoop",
+      apple_health: "apple",
     };
 
     const ourWearable = wearableMap[dataSource];
-    
+
     if (ourWearable) {
       await User.findOneAndUpdate(
         { firebaseUid: userId },
         {
           $set: {
-            [`wearableConnections.${ourWearable}.healthData`]: {
+            [`wearables.${ourWearable}.data`]: {
               ...healthData,
               lastFetched: new Date(),
             },
             updatedAt: new Date(),
-          }
+          },
         },
-        { new: true }
+        { new: true },
       );
-      
+
       console.log(`✅ Health data stored for ${ourWearable}`);
     }
 
@@ -472,12 +515,11 @@ export const fetchRookHealthData_DISABLED = async (req: Request, res: Response):
       message: `Health data fetched successfully from ${dataSource}`,
       data: healthData,
     });
-
   } catch (error: any) {
-    console.error('❌ Error fetching ROOK health data:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message || 'Failed to fetch health data' 
+    console.error("❌ Error fetching ROOK health data:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to fetch health data",
     });
   }
 };
@@ -486,15 +528,18 @@ export const fetchRookHealthData_DISABLED = async (req: Request, res: Response):
  * Get ROOK Authorization URL
  * Generates OAuth URL for wearable connection (keeps secret key secure on backend)
  */
-export const getRookAuthURL = async (req: Request, res: Response): Promise<void> => {
+export const getRookAuthURL = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
-    const userId = req.headers['x-firebase-uid'] as string;
+    const userId = req.headers["x-firebase-uid"] as string;
     const { mongoUserId, dataSource } = req.body;
 
     if (!mongoUserId || !dataSource) {
-      res.status(400).json({ 
-        success: false, 
-        error: 'mongoUserId and dataSource are required' 
+      res.status(400).json({
+        success: false,
+        error: "mongoUserId and dataSource are required",
       });
       return;
     }
@@ -504,39 +549,40 @@ export const getRookAuthURL = async (req: Request, res: Response): Promise<void>
     // Get credentials from environment (secure - not exposed to frontend)
     const clientUUID = process.env.ROOK_SANDBOX_CLIENT_UUID;
     const secretKey = process.env.ROOK_SANDBOX_SECRET_KEY;
-    const baseUrl = process.env.ROOK_SANDBOX_BASE_URL || 'https://api.rook-connect.review';
-    
+    const baseUrl =
+      process.env.ROOK_SANDBOX_BASE_URL || "https://api.rook-connect.review";
+
     // Get redirect URL from environment
     const redirectUri = process.env.EXPO_PUBLIC_OAUTH_REDIRECT_URL;
-    
+
     if (!clientUUID || !secretKey) {
-      res.status(500).json({ 
-        success: false, 
-        error: 'ROOK credentials not configured on server' 
+      res.status(500).json({
+        success: false,
+        error: "ROOK credentials not configured on server",
       });
       return;
     }
 
     if (!redirectUri) {
-      res.status(500).json({ 
-        success: false, 
-        error: 'OAuth redirect URL not configured on server' 
+      res.status(500).json({
+        success: false,
+        error: "OAuth redirect URL not configured on server",
       });
       return;
     }
 
     // Call ROOK API to get authorization URL
     const url = `${baseUrl}/api/v1/user_id/${mongoUserId}/data_source/${dataSource}/authorizer?redirect_url=${encodeURIComponent(redirectUri)}`;
-    
+
     const credentials = `${clientUUID}:${secretKey}`;
-    const basicAuth = Buffer.from(credentials).toString('base64');
+    const basicAuth = Buffer.from(credentials).toString("base64");
 
     const response = await fetch(url, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'User-Agent': 'H2Oasis/1.0.0',
-        'Authorization': `Basic ${basicAuth}`,
-        'Accept': 'application/json',
+        "User-Agent": "H2Oasis/1.0.0",
+        Authorization: `Basic ${basicAuth}`,
+        Accept: "application/json",
       },
     });
 
@@ -547,14 +593,14 @@ export const getRookAuthURL = async (req: Request, res: Response): Promise<void>
     }
 
     const data = await response.json();
-    
+
     // Check if already authorized
     if (data.authorized === true) {
       res.json({
         success: true,
         data: {
           isAlreadyConnected: true,
-          authorizationURL: '',
+          authorizationURL: "",
         },
       });
       return;
@@ -572,12 +618,11 @@ export const getRookAuthURL = async (req: Request, res: Response): Promise<void>
         isAlreadyConnected: false,
       },
     });
-
   } catch (error: any) {
-    console.error('❌ Error getting ROOK auth URL:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message || 'Failed to get authorization URL' 
+    console.error("❌ Error getting ROOK auth URL:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to get authorization URL",
     });
   }
 };

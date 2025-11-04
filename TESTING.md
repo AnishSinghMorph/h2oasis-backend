@@ -18,21 +18,25 @@ npm install
 ## Running Tests
 
 ### Run all tests
+
 ```bash
 npm test
 ```
 
 ### Run tests in watch mode (for development)
+
 ```bash
 npm run test:watch
 ```
 
 ### Run tests with coverage report
+
 ```bash
 npm run test:coverage
 ```
 
 ### Run tests in CI mode (for GitHub Actions)
+
 ```bash
 npm run test:ci
 ```
@@ -55,10 +59,10 @@ __tests__/
 ### Unit Test Example
 
 ```typescript
-describe('MyFunction', () => {
-  it('should return expected value', () => {
-    const result = myFunction('input');
-    expect(result).toBe('expected');
+describe("MyFunction", () => {
+  it("should return expected value", () => {
+    const result = myFunction("input");
+    expect(result).toBe("expected");
   });
 });
 ```
@@ -66,12 +70,12 @@ describe('MyFunction', () => {
 ### Integration Test Example (API Endpoint)
 
 ```typescript
-import request from 'supertest';
-import app from '../server';
+import request from "supertest";
+import app from "../server";
 
-describe('GET /api/endpoint', () => {
-  it('should return 200', async () => {
-    const response = await request(app).get('/api/endpoint');
+describe("GET /api/endpoint", () => {
+  it("should return 200", async () => {
+    const response = await request(app).get("/api/endpoint");
     expect(response.status).toBe(200);
   });
 });
@@ -80,11 +84,13 @@ describe('GET /api/endpoint', () => {
 ## Test Coverage
 
 View coverage report after running `npm run test:coverage`:
+
 - Open `coverage/lcov-report/index.html` in your browser
 
 ## CI/CD Integration
 
 Tests run automatically on:
+
 - Pull requests
 - Push to main branch
 - Manual workflow dispatch
@@ -101,16 +107,21 @@ Tests run automatically on:
 ## Troubleshooting
 
 ### Tests timeout
+
 Increase timeout in `jest.config.js` or individual tests:
+
 ```typescript
 jest.setTimeout(15000); // 15 seconds
 ```
 
 ### Module not found errors
+
 Ensure all dependencies are installed:
+
 ```bash
 npm install
 ```
 
 ### Environment variables
+
 Tests use `.env.test` or mock values from `__tests__/setup.ts`

@@ -1,7 +1,7 @@
-import { Router } from 'express';
-import { AuthController } from '../controllers/auth.controller';
-import { verifyFirebaseToken } from '../middleware/auth.middleware';
-import { asyncHandler } from '../middleware/essential.middleware';
+import { Router } from "express";
+import { AuthController } from "../controllers/auth.controller";
+import { verifyFirebaseToken } from "../middleware/auth.middleware";
+import { asyncHandler } from "../middleware/essential.middleware";
 
 const router = Router();
 
@@ -40,7 +40,7 @@ const router = Router();
  *       400:
  *         description: Invalid input or user already exists
  */
-router.post('/register', asyncHandler(AuthController.register));
+router.post("/register", asyncHandler(AuthController.register));
 
 /**
  * @swagger
@@ -85,7 +85,7 @@ router.post('/register', asyncHandler(AuthController.register));
  *       401:
  *         description: Invalid credentials
  */
-router.post('/login', asyncHandler(AuthController.login));
+router.post("/login", asyncHandler(AuthController.login));
 
 /**
  * @swagger
@@ -102,7 +102,11 @@ router.post('/login', asyncHandler(AuthController.login));
  *       401:
  *         description: Unauthorized
  */
-router.get('/profile', verifyFirebaseToken, asyncHandler(AuthController.getProfile));
+router.get(
+  "/profile",
+  verifyFirebaseToken,
+  asyncHandler(AuthController.getProfile),
+);
 
 /**
  * @swagger
@@ -119,6 +123,10 @@ router.get('/profile', verifyFirebaseToken, asyncHandler(AuthController.getProfi
  *       401:
  *         description: Unauthorized
  */
-router.post('/complete-onboarding', verifyFirebaseToken, asyncHandler(AuthController.completeOnboarding));
+router.post(
+  "/complete-onboarding",
+  verifyFirebaseToken,
+  asyncHandler(AuthController.completeOnboarding),
+);
 
 export default router;

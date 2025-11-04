@@ -1,5 +1,5 @@
-import { Request, Response, NextFunction } from 'express';
-import * as admin from 'firebase-admin';
+import { Request, Response, NextFunction } from "express";
+import * as admin from "firebase-admin";
 
 // Extend Express Request type to include user data
 export interface AuthenticatedRequest extends Request {
@@ -19,18 +19,18 @@ export interface AuthenticatedRequest extends Request {
 export const verifyFirebaseToken = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     // Method 1: Check for firebaseUid in headers (for testing)
-    const firebaseUid = req.headers['x-firebase-uid'] as string;
+    const firebaseUid = req.headers["x-firebase-uid"] as string;
     if (firebaseUid) {
       (req as AuthenticatedRequest).user = {
         uid: firebaseUid,
-        email: '',
-        name: '',
-        picture: '',
-        provider: 'test'
+        email: "",
+        name: "",
+        picture: "",
+        provider: "test",
       };
       next();
       return;
@@ -38,56 +38,58 @@ export const verifyFirebaseToken = async (
 
     // Method 2: Extract token from Authorization header
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({ 
-        error: 'Unauthorized', 
-        message: 'No valid authorization token provided' 
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      res.status(401).json({
+        error: "Unauthorized",
+        message: "No valid authorization token provided",
       });
       return;
     }
 
-    const token = authHeader.split('Bearer ')[1];
+    const token = authHeader.split("Bearer ")[1];
 
     try {
       // Try to verify as ID token first
       const decodedToken = await admin.auth().verifyIdToken(token);
-      
+
       (req as AuthenticatedRequest).user = {
         uid: decodedToken.uid,
         email: decodedToken.email,
         name: decodedToken.name,
         picture: decodedToken.picture,
-        provider: decodedToken.firebase.sign_in_provider
+        provider: decodedToken.firebase.sign_in_provider,
       };
 
       next();
     } catch (idTokenError) {
       // If ID token fails, try custom token (for testing)
       try {
-        const decodedCustomToken = await admin.auth().verifyIdToken(token, true);
-        
+        const decodedCustomToken = await admin
+          .auth()
+          .verifyIdToken(token, true);
+
         (req as AuthenticatedRequest).user = {
           uid: decodedCustomToken.uid,
           email: decodedCustomToken.email,
           name: decodedCustomToken.name,
           picture: decodedCustomToken.picture,
-          provider: 'custom'
+          provider: "custom",
         };
 
         next();
       } catch (customTokenError) {
-        console.error('Token verification failed:', customTokenError);
-        res.status(401).json({ 
-          error: 'Unauthorized', 
-          message: 'Invalid or expired token' 
+        console.error("Token verification failed:", customTokenError);
+        res.status(401).json({
+          error: "Unauthorized",
+          message: "Invalid or expired token",
         });
       }
     }
   } catch (error) {
-    console.error('Auth middleware error:', error);
-    res.status(401).json({ 
-      error: 'Unauthorized', 
-      message: 'Authentication failed' 
+    console.error("Auth middleware error:", error);
+    res.status(401).json({
+      error: "Unauthorized",
+      message: "Authentication failed",
     });
   }
 };

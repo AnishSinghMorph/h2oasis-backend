@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import OpenAI from "openai";
 
 interface HealthData {
   // New unified format
@@ -26,9 +26,9 @@ interface HealthData {
   };
   lastSync?: string;
   source?: string;
-  dataStatus?: 'available' | 'loading' | 'error' | 'no_data';
+  dataStatus?: "available" | "loading" | "error" | "no_data";
   note?: string;
-  
+
   // Legacy fields
   calories?: number;
   hasBodyMetrics?: boolean;
@@ -38,12 +38,12 @@ interface HealthData {
 
 interface ProductContext {
   productName: string;
-  productType: 'cold_plunge' | 'hot_tub' | 'sauna' | 'recovery_suite';
+  productType: "cold_plunge" | "hot_tub" | "sauna" | "recovery_suite";
   features?: string[];
 }
 
 interface ChatMessage {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   timestamp: Date;
 }
@@ -61,7 +61,7 @@ export class OpenAIService {
 
   constructor() {
     this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
+      apiKey: process.env.OPENAI_API_KEY,
     });
   }
 
@@ -69,67 +69,73 @@ export class OpenAIService {
     try {
       // Detect if user is asking for a plan
       const userMessage = context.userMessage.toLowerCase();
-      const isPlanRequest = 
-        userMessage.includes('plan') ||
-        userMessage.includes('create') ||
-        userMessage.includes('make') ||
-        userMessage.includes('generate') ||
-        userMessage.includes('personalized') ||
-        userMessage.includes('routine') ||
-        userMessage.includes('schedule');
+      const isPlanRequest =
+        userMessage.includes("plan") ||
+        userMessage.includes("create") ||
+        userMessage.includes("make") ||
+        userMessage.includes("generate") ||
+        userMessage.includes("personalized") ||
+        userMessage.includes("routine") ||
+        userMessage.includes("schedule");
 
       const systemPrompt = this.buildSystemPrompt(context, isPlanRequest);
       const userPrompt = this.buildUserPrompt(context);
 
       const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
         {
-          role: 'system',
-          content: systemPrompt
-        }
+          role: "system",
+          content: systemPrompt,
+        },
       ];
 
       // Add chat history if available
       if (context.chatHistory && context.chatHistory.length > 0) {
-        const historyMessages = context.chatHistory.slice(-10).map(msg => ({
-          role: msg.role as 'user' | 'assistant',
-          content: msg.content
+        const historyMessages = context.chatHistory.slice(-10).map((msg) => ({
+          role: msg.role as "user" | "assistant",
+          content: msg.content,
         }));
         messages.push(...historyMessages);
       }
 
       // Add current user message
       messages.push({
-        role: 'user',
-        content: userPrompt
+        role: "user",
+        content: userPrompt,
       });
 
       const completion = await this.openai.chat.completions.create({
-        model: 'gpt-4',
+        model: "gpt-4",
         messages: messages,
         max_tokens: 150, // Increased for plan suggestions
         temperature: 0.7,
         presence_penalty: 0.1,
-        frequency_penalty: 0.1
+        frequency_penalty: 0.1,
       });
 
-      let response = completion.choices[0]?.message?.content || 'I apologize, but I\'m having trouble generating a response right now. Please try again.';
+      let response =
+        completion.choices[0]?.message?.content ||
+        "I apologize, but I'm having trouble generating a response right now. Please try again.";
 
       // If user asked for a plan, append special marker
       if (isPlanRequest) {
-        response += '\n\n[ACTION:CREATE_PLAN]';
+        response += "\n\n[ACTION:CREATE_PLAN]";
       }
 
       return response;
     } catch (error) {
-      console.error('OpenAI Service Error:', error);
-      throw new Error('Failed to generate AI response');
+      console.error("OpenAI Service Error:", error);
+      throw new Error("Failed to generate AI response");
     }
   }
 
-  private buildSystemPrompt(context: ChatContext, isPlanRequest: boolean = false): string {
-  const { productContext, healthData } = context;
-  
-  const planInstructions = isPlanRequest ? `
+  private buildSystemPrompt(
+    context: ChatContext,
+    isPlanRequest: boolean = false,
+  ): string {
+    const { productContext, healthData } = context;
+
+    const planInstructions = isPlanRequest
+      ? `
 
 PLAN GENERATION REQUEST DETECTED:
 The user is asking for a personalized recovery plan. Respond with:
@@ -137,9 +143,10 @@ The user is asking for a personalized recovery plan. Respond with:
 2. Tell them you'll create a personalized plan based on their health data and ${productContext.productName}
 3. Keep it under 2 sentences total
 
-Example: "I'll create a personalized recovery plan based on your activity data and Cold Plunge. This will optimize your recovery and performance!"` : '';
+Example: "I'll create a personalized recovery plan based on your activity data and Cold Plunge. This will optimize your recovery and performance!"`
+      : "";
 
-  return `You are Evy, an expert AI health recovery specialist with deep knowledge in contrast therapy, specifically cold plunge, hot tubs, saunas, and recovery protocols. You work for H2Oasis, a company that creates premium recovery products.
+    return `You are Evy, an expert AI health recovery specialist with deep knowledge in contrast therapy, specifically cold plunge, hot tubs, saunas, and recovery protocols. You work for H2Oasis, a company that creates premium recovery products.
 
 EXPERTISE AREAS:
 - Cold water therapy and cold plunge protocols
@@ -153,7 +160,7 @@ EXPERTISE AREAS:
 - Hormone optimization through temperature exposure
 
 USER'S PRODUCT: ${productContext.productName} (${productContext.productType})
-${productContext.features ? `Features: ${productContext.features.join(', ')}` : ''}
+${productContext.features ? `Features: ${productContext.features.join(", ")}` : ""}
 
 CURRENT HEALTH DATA:
 ${this.formatHealthData(healthData)}
@@ -172,7 +179,7 @@ GUIDELINES:
 IMPORTANT: Always keep responses very short (1-2 sentences only). No paragraphs.${planInstructions}
 
 Remember: You're helping them optimize their recovery and wellness journey with their H2Oasis product. Keep it short!`;
-}
+  }
 
   private buildUserPrompt(context: ChatContext): string {
     return `Based on my current health data and my ${context.productContext.productName}, here's my question: ${context.userMessage}`;
@@ -180,33 +187,41 @@ Remember: You're helping them optimize their recovery and wellness journey with 
 
   private formatHealthData(healthData: HealthData): string {
     const dataPoints = [];
-    
+
     // Handle data status
-    if (healthData.dataStatus === 'loading') {
-      return 'Health data is currently being synced...';
+    if (healthData.dataStatus === "loading") {
+      return "Health data is currently being synced...";
     }
-    
-    if (healthData.dataStatus === 'error' || healthData.error) {
-      return 'Health data sync failed - providing general recommendations';
+
+    if (healthData.dataStatus === "error" || healthData.error) {
+      return "Health data sync failed - providing general recommendations";
     }
-    
-    if (healthData.dataStatus === 'no_data' || healthData.note) {
-      return healthData.note || 'No health data available - connect a wearable device';
+
+    if (healthData.dataStatus === "no_data" || healthData.note) {
+      return (
+        healthData.note ||
+        "No health data available - connect a wearable device"
+      );
     }
-    
+
     // Format physical data
     if (healthData.physical) {
       const p = healthData.physical;
       if (p.steps) dataPoints.push(`Steps: ${p.steps.toLocaleString()}`);
       if (p.calories_kcal) dataPoints.push(`Calories: ${p.calories_kcal} kcal`);
-      if (p.distance_meters) dataPoints.push(`Distance: ${(p.distance_meters / 1000).toFixed(1)} km`);
+      if (p.distance_meters)
+        dataPoints.push(
+          `Distance: ${(p.distance_meters / 1000).toFixed(1)} km`,
+        );
       if (p.active_minutes) dataPoints.push(`Active: ${p.active_minutes} min`);
       if (p.heart_rate) {
-        if (p.heart_rate.avg_bpm) dataPoints.push(`Avg HR: ${p.heart_rate.avg_bpm} bpm`);
-        if (p.heart_rate.resting_bpm) dataPoints.push(`Resting HR: ${p.heart_rate.resting_bpm} bpm`);
+        if (p.heart_rate.avg_bpm)
+          dataPoints.push(`Avg HR: ${p.heart_rate.avg_bpm} bpm`);
+        if (p.heart_rate.resting_bpm)
+          dataPoints.push(`Resting HR: ${p.heart_rate.resting_bpm} bpm`);
       }
     }
-    
+
     // Format sleep data
     if (healthData.sleep) {
       const s = healthData.sleep;
@@ -214,37 +229,41 @@ Remember: You're helping them optimize their recovery and wellness journey with 
         const hours = (s.duration_minutes / 60).toFixed(1);
         dataPoints.push(`Sleep: ${hours} hours`);
       }
-      if (s.efficiency_percentage) dataPoints.push(`Sleep Efficiency: ${s.efficiency_percentage}%`);
-      if (s.deep_sleep_minutes) dataPoints.push(`Deep Sleep: ${s.deep_sleep_minutes} min`);
+      if (s.efficiency_percentage)
+        dataPoints.push(`Sleep Efficiency: ${s.efficiency_percentage}%`);
+      if (s.deep_sleep_minutes)
+        dataPoints.push(`Deep Sleep: ${s.deep_sleep_minutes} min`);
     }
-    
+
     // Format body data
     if (healthData.body) {
       const b = healthData.body;
       if (b.weight_kg) dataPoints.push(`Weight: ${b.weight_kg} kg`);
       if (b.bmi) dataPoints.push(`BMI: ${b.bmi}`);
     }
-    
+
     // Legacy support
     if (healthData.calories && !healthData.physical) {
       dataPoints.push(`Calories: ${healthData.calories}`);
     }
-    
+
     if (healthData.lastSync) {
       const syncTime = new Date(healthData.lastSync);
       dataPoints.push(`Last sync: ${syncTime.toLocaleTimeString()}`);
     }
-    
+
     if (healthData.source) {
       dataPoints.push(`Source: ${healthData.source}`);
     }
 
-    return dataPoints.length > 0 ? dataPoints.join('\n') : 'No current health data available - providing general recovery advice';
+    return dataPoints.length > 0
+      ? dataPoints.join("\n")
+      : "No current health data available - providing general recovery advice";
   }
 
   async analyzeHealthTrends(healthData: HealthData[]): Promise<string> {
     // Future enhancement: analyze health trends over time
-    return 'Health trend analysis coming soon';
+    return "Health trend analysis coming soon";
   }
 
   async generateRecoveryPlan(context: ChatContext): Promise<any> {
@@ -280,134 +299,140 @@ Return ONLY a JSON object in this exact format:
 NO explanations, JUST the JSON.`;
 
       const completion = await this.openai.chat.completions.create({
-        model: 'gpt-4',
+        model: "gpt-4",
         messages: [
           {
-            role: 'system',
-            content: 'You are a recovery specialist. Respond ONLY with valid JSON. No markdown, no explanations.'
+            role: "system",
+            content:
+              "You are a recovery specialist. Respond ONLY with valid JSON. No markdown, no explanations.",
           },
           {
-            role: 'user',
-            content: planPrompt
-          }
+            role: "user",
+            content: planPrompt,
+          },
         ],
         max_tokens: 500,
-        temperature: 0.7
+        temperature: 0.7,
       });
 
-      const responseText = completion.choices[0]?.message?.content || '{}';
-      
+      const responseText = completion.choices[0]?.message?.content || "{}";
+
       // Clean up the response (remove markdown code blocks if present)
       const cleanedResponse = responseText
-        .replace(/```json\n?/g, '')
-        .replace(/```\n?/g, '')
+        .replace(/```json\n?/g, "")
+        .replace(/```\n?/g, "")
         .trim();
 
       try {
         const plan = JSON.parse(cleanedResponse);
-        
+
         // Extract health insights from health data
         const insights = {
-          heartRate: healthData.physical?.heart_rate?.avg_bpm 
+          heartRate: healthData.physical?.heart_rate?.avg_bpm
             ? `${healthData.physical.heart_rate.avg_bpm} Bpm`
-            : plan.insights?.heartRate || 'N/A',
+            : plan.insights?.heartRate || "N/A",
           sleepData: healthData.sleep?.duration_minutes
             ? `${(healthData.sleep.duration_minutes / 60).toFixed(0)} Hour`
-            : plan.insights?.sleepData || 'N/A',
-          recommendation: plan.insights?.recommendation || 'Personalized recovery plan based on your metrics'
+            : plan.insights?.sleepData || "N/A",
+          recommendation:
+            plan.insights?.recommendation ||
+            "Personalized recovery plan based on your metrics",
         };
 
         return {
           sessions: plan.sessions || [],
           insights: insights,
           createdAt: new Date().toISOString(),
-          productName: productContext.productName
+          productName: productContext.productName,
         };
       } catch (parseError) {
-        console.error('Failed to parse AI plan response:', parseError);
-        console.error('Response was:', cleanedResponse);
-        
+        console.error("Failed to parse AI plan response:", parseError);
+        console.error("Response was:", cleanedResponse);
+
         // Return fallback plan
         return this.getFallbackPlan(productContext, healthData);
       }
     } catch (error) {
-      console.error('Generate Recovery Plan Error:', error);
+      console.error("Generate Recovery Plan Error:", error);
       // Return fallback plan on error
       return this.getFallbackPlan(context.productContext, context.healthData);
     }
   }
 
-  private getFallbackPlan(productContext: ProductContext, healthData: HealthData): any {
+  private getFallbackPlan(
+    productContext: ProductContext,
+    healthData: HealthData,
+  ): any {
     const productType = productContext.productType;
-    
+
     let sessions: any[] = [];
-    
-    if (productType === 'cold_plunge' || productType === 'recovery_suite') {
+
+    if (productType === "cold_plunge" || productType === "recovery_suite") {
       sessions = [
         {
           title: "Morning Cold Plunge",
           duration: "3 mins",
           description: "Boost energy and mental clarity",
-          icon: "❄️"
+          icon: "❄️",
         },
         {
           title: "Post-Workout Recovery",
           duration: "4 mins",
           description: "Reduce inflammation and muscle soreness",
-          icon: "💪"
+          icon: "💪",
         },
         {
           title: "Evening Wind Down",
           duration: "2 mins",
           description: "Improve sleep quality",
-          icon: "🌙"
-        }
+          icon: "🌙",
+        },
       ];
-    } else if (productType === 'hot_tub') {
+    } else if (productType === "hot_tub") {
       sessions = [
         {
           title: "Morning Warm-Up",
           duration: "5 mins",
           description: "Loosen muscles and increase flexibility",
-          icon: "🔥"
+          icon: "🔥",
         },
         {
           title: "Midday Stress Relief",
           duration: "4 mins",
           description: "Reduce tension and improve mood",
-          icon: "🧘"
-        }
+          icon: "🧘",
+        },
       ];
-    } else if (productType === 'sauna') {
+    } else if (productType === "sauna") {
       sessions = [
         {
           title: "Morning Detox",
           duration: "3 mins",
           description: "Boost metabolism and energy",
-          icon: "🔥"
+          icon: "🔥",
         },
         {
           title: "Evening Recovery",
           duration: "4 mins",
           description: "Deep muscle relaxation",
-          icon: "🌙"
-        }
+          icon: "🌙",
+        },
       ];
     }
 
     return {
       sessions,
       insights: {
-        heartRate: healthData.physical?.heart_rate?.avg_bpm 
+        heartRate: healthData.physical?.heart_rate?.avg_bpm
           ? `${healthData.physical.heart_rate.avg_bpm} Bpm`
-          : '90 Bpm',
+          : "90 Bpm",
         sleepData: healthData.sleep?.duration_minutes
           ? `${(healthData.sleep.duration_minutes / 60).toFixed(0)} Hour`
-          : '8 Hour',
-        recommendation: `Personalized ${productContext.productName} recovery plan`
+          : "8 Hour",
+        recommendation: `Personalized ${productContext.productName} recovery plan`,
       },
       createdAt: new Date().toISOString(),
-      productName: productContext.productName
+      productName: productContext.productName,
     };
   }
 }

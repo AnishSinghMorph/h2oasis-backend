@@ -2,8 +2,8 @@
 // This runs once before all tests
 
 // Set test environment variables
-process.env.NODE_ENV = 'test';
-process.env.PORT = '3001';
+process.env.NODE_ENV = "test";
+process.env.PORT = "3001";
 
 // Mock console methods if needed
 global.console = {

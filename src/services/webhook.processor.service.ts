@@ -1,7 +1,7 @@
-import { User } from '../models/User.model';
-import { HealthDataTransformer } from './healthData.transformer.service';
-import { HealthDataMerger } from './healthData.merger.service';
-import { IRookWebhookPayload } from '../models/HealthData.types';
+import { User } from "../models/User.model";
+import { HealthDataTransformer } from "./healthData.transformer.service";
+import { HealthDataMerger } from "./healthData.merger.service";
+import { IRookWebhookPayload } from "../models/HealthData.types";
 
 /**
  * Webhook Processor Service
@@ -27,23 +27,28 @@ export class WebhookProcessor {
     wearableName: string,
     dataStructure: string,
     payload: IRookWebhookPayload,
-    retryCount = 0
+    retryCount = 0,
   ): Promise<ProcessWebhookResult> {
     try {
-      console.log(`🔄 Processing webhook for ${wearableName}, data_structure: ${dataStructure}`);
-      
+      console.log(
+        `🔄 Processing webhook for ${wearableName}, data_structure: ${dataStructure}`,
+      );
+
       // Transform data
       const transformedData = HealthDataTransformer.transform(payload);
 
       if (!transformedData) {
         return {
           success: false,
-          message: 'No data extracted from webhook',
+          message: "No data extracted from webhook",
         };
       }
 
       console.log(`✅ Transformed data keys:`, Object.keys(transformedData));
-      console.log(`📦 Transformed data sample:`, JSON.stringify(transformedData).substring(0, 200));
+      console.log(
+        `📦 Transformed data sample:`,
+        JSON.stringify(transformedData).substring(0, 200),
+      );
 
       // Get data type
       const dataType = HealthDataMerger.getDataType(dataStructure);
@@ -51,10 +56,10 @@ export class WebhookProcessor {
       if (!dataType) {
         return {
           success: false,
-          message: 'Unknown data type',
+          message: "Unknown data type",
         };
       }
-      
+
       console.log(`📝 Data type mapped to: ${dataType}`);
 
       // Get user
@@ -63,15 +68,16 @@ export class WebhookProcessor {
       if (!user) {
         return {
           success: false,
-          message: 'User not found',
+          message: "User not found",
         };
       }
 
       // Build atomic update path
-      const updateField = `wearableConnections.${wearableName}.healthData.${dataType}`;
+      const updateField = `wearables.${wearableName}.data.${dataType}`;
 
       // Get existing data for this specific data type only
-      const existingDataForType = user.wearableConnections?.[wearableName]?.healthData?.[dataType];
+      const existingDataForType =
+        user.wearables?.[wearableName]?.data?.[dataType];
 
       // Merge ONLY this data type
       const mergedDataForType = existingDataForType
@@ -79,24 +85,24 @@ export class WebhookProcessor {
         : transformedData;
 
       console.log(`💾 About to save to path: ${updateField}`);
-      console.log(`💾 Data being saved (first 300 chars):`, JSON.stringify(mergedDataForType).substring(0, 300));
+      console.log(
+        `💾 Data being saved (first 300 chars):`,
+        JSON.stringify(mergedDataForType).substring(0, 300),
+      );
 
-      // ✅ FIX: Check if healthData is null and initialize it first
-      const healthDataPath = `wearableConnections.${wearableName}.healthData`;
-      const currentHealthData = user.wearableConnections?.[wearableName]?.healthData;
+      // ✅ FIX: Check if data is null and initialize it first
+      const dataPath = `wearables.${wearableName}.data`;
+      const currentData = user.wearables?.[wearableName]?.data;
 
-      if (currentHealthData === null || currentHealthData === undefined) {
-        console.log(`🔧 Initializing healthData for ${wearableName}...`);
-        
-        // First, initialize healthData as empty object
-        await User.findByIdAndUpdate(
-          userId,
-          {
-            $set: {
-              [healthDataPath]: {},
-            },
-          }
-        );
+      if (currentData === null || currentData === undefined) {
+        console.log(`🔧 Initializing data for ${wearableName}...`);
+
+        // First, initialize data as empty object
+        await User.findByIdAndUpdate(userId, {
+          $set: {
+            [dataPath]: {},
+          },
+        });
       }
 
       // Now do the atomic update on the specific data type
@@ -105,40 +111,55 @@ export class WebhookProcessor {
         {
           $set: {
             [updateField]: mergedDataForType,
-            [`wearableConnections.${wearableName}.lastSync`]: new Date(),
-            [`wearableConnections.${wearableName}.connected`]: true,
+            [`wearables.${wearableName}.lastSync`]: new Date(),
+            [`wearables.${wearableName}.connected`]: true,
             updatedAt: new Date(),
           },
         },
-        { new: true }
+        { new: true },
       );
 
-      console.log(`✅ Clean health data saved for ${wearableName} (${dataType})`);
-      
+      console.log(
+        `✅ Clean health data saved for ${wearableName} (${dataType})`,
+      );
+
       // Verify what was actually saved
-      const savedData = updateResult?.wearableConnections?.[wearableName]?.healthData?.[dataType];
-      console.log(`🔍 Verification - saved data keys:`, savedData ? Object.keys(savedData) : 'null');
+      const savedData =
+        updateResult?.wearables?.[wearableName]?.data?.[dataType];
+      console.log(
+        `🔍 Verification - saved data keys:`,
+        savedData ? Object.keys(savedData) : "null",
+      );
 
       return {
         success: true,
-        message: 'Webhook processed successfully',
+        message: "Webhook processed successfully",
         dataType,
       };
     } catch (error: any) {
-      console.error(`❌ Error processing webhook (attempt ${retryCount + 1}/${this.MAX_RETRIES}):`, error);
+      console.error(
+        `❌ Error processing webhook (attempt ${retryCount + 1}/${this.MAX_RETRIES}):`,
+        error,
+      );
 
       // Retry logic for transient errors
       if (retryCount < this.MAX_RETRIES && this.isRetryableError(error)) {
         console.log(`🔄 Retrying in ${this.RETRY_DELAY_MS}ms...`);
-        
+
         await this.sleep(this.RETRY_DELAY_MS);
-        
-        return this.processWebhook(userId, wearableName, dataStructure, payload, retryCount + 1);
+
+        return this.processWebhook(
+          userId,
+          wearableName,
+          dataStructure,
+          payload,
+          retryCount + 1,
+        );
       }
 
       return {
         success: false,
-        message: 'Failed to process webhook',
+        message: "Failed to process webhook",
         error: error.message,
       };
     }
@@ -149,15 +170,18 @@ export class WebhookProcessor {
    */
   private static isRetryableError(error: any): boolean {
     const retryableErrors = [
-      'ECONNRESET',
-      'ETIMEDOUT',
-      'ENOTFOUND',
-      'MongoNetworkError',
-      'MongoTimeoutError',
+      "ECONNRESET",
+      "ETIMEDOUT",
+      "ENOTFOUND",
+      "MongoNetworkError",
+      "MongoTimeoutError",
     ];
 
-    return retryableErrors.some((err) => 
-      error.message?.includes(err) || error.code === err || error.name === err
+    return retryableErrors.some(
+      (err) =>
+        error.message?.includes(err) ||
+        error.code === err ||
+        error.name === err,
     );
   }
 
@@ -171,12 +195,14 @@ export class WebhookProcessor {
   /**
    * Batch process multiple webhooks (if needed in future)
    */
-  static async processBatch(webhooks: Array<{
-    userId: string;
-    wearableName: string;
-    dataStructure: string;
-    payload: IRookWebhookPayload;
-  }>): Promise<ProcessWebhookResult[]> {
+  static async processBatch(
+    webhooks: Array<{
+      userId: string;
+      wearableName: string;
+      dataStructure: string;
+      payload: IRookWebhookPayload;
+    }>,
+  ): Promise<ProcessWebhookResult[]> {
     console.log(`📦 Processing batch of ${webhooks.length} webhooks`);
 
     // Process all in parallel (MongoDB handles concurrency)
@@ -186,13 +212,15 @@ export class WebhookProcessor {
           webhook.userId,
           webhook.wearableName,
           webhook.dataStructure,
-          webhook.payload
-        )
-      )
+          webhook.payload,
+        ),
+      ),
     );
 
     const successCount = results.filter((r) => r.success).length;
-    console.log(`✅ Batch processed: ${successCount}/${webhooks.length} successful`);
+    console.log(
+      `✅ Batch processed: ${successCount}/${webhooks.length} successful`,
+    );
 
     return results;
   }

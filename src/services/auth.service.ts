@@ -1,5 +1,5 @@
-import { User, IUser } from '../models/User.model';
-import { admin } from '../utils/firebase';
+import { User, IUser } from "../models/User.model";
+import { admin } from "../utils/firebase";
 
 export interface CreateUserData {
   firebaseUid: string;
@@ -29,22 +29,22 @@ export class AuthService {
           lastLoginAt: new Date(),
           isActive: true,
           // Set verification status based on provider
-          isEmailVerified: userData.provider !== 'password',
+          isEmailVerified: userData.provider !== "password",
           isPhoneVerified: false,
           // Profile completion logic
-          profileCompleted: userData.provider !== 'password'
+          profileCompleted: userData.provider !== "password",
         },
-        { 
+        {
           upsert: true, // Create if doesn't exist
-          new: true,    // Return updated document
-          runValidators: true
-        }
+          new: true, // Return updated document
+          runValidators: true,
+        },
       );
 
       return user;
     } catch (error) {
-      console.error('Error creating/updating user:', error);
-      throw new Error('Failed to create or update user');
+      console.error("Error creating/updating user:", error);
+      throw new Error("Failed to create or update user");
     }
   }
 
@@ -52,36 +52,41 @@ export class AuthService {
    * Get user by Firebase UID
    * Used for profile retrieval and user verification
    */
-  static async getUserByFirebaseUid(firebaseUid: string): Promise<IUser | null> {
+  static async getUserByFirebaseUid(
+    firebaseUid: string,
+  ): Promise<IUser | null> {
     try {
       return await User.findOne({ firebaseUid, isActive: true });
     } catch (error) {
-      console.error('Error fetching user:', error);
-      throw new Error('Failed to fetch user');
+      console.error("Error fetching user:", error);
+      throw new Error("Failed to fetch user");
     }
   }
 
   /**
    * Update user profile information
    */
-  static async updateUserProfile(firebaseUid: string, updateData: Partial<IUser>): Promise<IUser | null> {
+  static async updateUserProfile(
+    firebaseUid: string,
+    updateData: Partial<IUser>,
+  ): Promise<IUser | null> {
     try {
       const user = await User.findOneAndUpdate(
         { firebaseUid, isActive: true },
-        { 
+        {
           ...updateData,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         },
-        { 
+        {
           new: true,
-          runValidators: true
-        }
+          runValidators: true,
+        },
       );
 
       return user;
     } catch (error) {
-      console.error('Error updating user profile:', error);
-      throw new Error('Failed to update user profile');
+      console.error("Error updating user profile:", error);
+      throw new Error("Failed to update user profile");
     }
   }
 
@@ -91,16 +96,13 @@ export class AuthService {
    */
   static async deactivateUser(firebaseUid: string): Promise<void> {
     try {
-      await User.findOneAndUpdate(
-        { firebaseUid },
-        { isActive: false }
-      );
-      
+      await User.findOneAndUpdate({ firebaseUid }, { isActive: false });
+
       // Also disable in Firebase Auth
       await admin.auth().updateUser(firebaseUid, { disabled: true });
     } catch (error) {
-      console.error('Error deactivating user:', error);
-      throw new Error('Failed to deactivate user');
+      console.error("Error deactivating user:", error);
+      throw new Error("Failed to deactivate user");
     }
   }
 
@@ -111,14 +113,14 @@ export class AuthService {
     try {
       await User.findOneAndUpdate(
         { firebaseUid },
-        { 
+        {
           isEmailVerified: true,
-          profileCompleted: true
-        }
+          profileCompleted: true,
+        },
       );
     } catch (error) {
-      console.error('Error marking email as verified:', error);
-      throw new Error('Failed to mark email as verified');
+      console.error("Error marking email as verified:", error);
+      throw new Error("Failed to mark email as verified");
     }
   }
 }
