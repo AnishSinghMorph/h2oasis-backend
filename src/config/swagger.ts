@@ -32,11 +32,11 @@ const options: swaggerJsdoc.Options = {
     ],
     servers: [
       {
-        url: "http://localhost:3000",
+        url: "https://api.h2oasis.ai",
         description: "Development server",
       },
       {
-        url: "https://api.h2oasis.com",
+        url: "https://api.h2oasis.ai",
         description: "Production server",
       },
     ],
