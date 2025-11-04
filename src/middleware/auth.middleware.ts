@@ -1,3 +1,5 @@
+// FILE: src/middleware/auth.middleware.ts (UPDATED)
+// ============================================
 import { Request, Response, NextFunction } from "express";
 import * as admin from "firebase-admin";
 
@@ -32,14 +34,14 @@ export const verifyFirebaseToken = async (
         picture: "",
         provider: "test",
       };
-      next();
-      return;
+      return next();
     }
 
     // Method 2: Extract token from Authorization header
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       res.status(401).json({
+        success: false,
         error: "Unauthorized",
         message: "No valid authorization token provided",
       });
@@ -80,6 +82,7 @@ export const verifyFirebaseToken = async (
       } catch (customTokenError) {
         console.error("Token verification failed:", customTokenError);
         res.status(401).json({
+          success: false,
           error: "Unauthorized",
           message: "Invalid or expired token",
         });
@@ -88,6 +91,7 @@ export const verifyFirebaseToken = async (
   } catch (error) {
     console.error("Auth middleware error:", error);
     res.status(401).json({
+      success: false,
       error: "Unauthorized",
       message: "Authentication failed",
     });

@@ -8,6 +8,7 @@ import {
   errorHandler,
   notFound,
 } from "./src/middleware/essential.middleware";
+import { ensureDbConnection } from "./src/middleware/database.middleware";
 import { DatabaseService } from "./src/utils/database";
 import { Product } from "./src/models/Product.model";
 import authRoutes from "./src/routes/auth.routes";
@@ -42,12 +43,17 @@ const corsOptions = {
   optionsSuccessStatus: 200,
 };
 
+// ============================================
 // MIDDLEWARE SETUP (Order matters!)
-app.use(logger); // 1. Log all requests
+// ============================================
+app.use(logger); // 1. Log all requests FIRST
 app.use(cors(corsOptions)); // 2. Handle CORS
 app.use(express.json()); // 3. Parse JSON bodies
+app.use(ensureDbConnection); // 4. Ensure DB connection before routes
 
+// ============================================
 // SWAGGER API DOCUMENTATION
+// ============================================
 app.use(
   "/api-docs",
   swaggerUi.serve,
@@ -63,7 +69,9 @@ app.get("/api-docs.json", (req, res) => {
   res.send(swaggerSpec);
 });
 
+// ============================================
 // ROUTES
+// ============================================
 app.use("/health", healthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
@@ -107,10 +115,34 @@ app.get(
   },
 );
 
+// ============================================
+// ERROR HANDLERS (Must be AFTER all routes!)
+// ============================================
 app.use(notFound);
 app.use(errorHandler);
 
-// Start server
+// ============================================
+// GRACEFUL SHUTDOWN
+// ============================================
+const gracefulShutdown = async (signal: string) => {
+  console.log(`\n${signal} received. Starting graceful shutdown...`);
+  
+  try {
+    await DatabaseService.disconnect();
+    console.log("✅ Database disconnected successfully");
+    process.exit(0);
+  } catch (error) {
+    console.error("❌ Error during shutdown:", error);
+    process.exit(1);
+  }
+};
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
+// ============================================
+// START SERVER
+// ============================================
 app.listen(port, "0.0.0.0", async () => {
   console.log(`Server running on http://localhost:${port}`);
   console.log(`Network access: http://192.168.1.76:${port}`);
@@ -141,5 +173,6 @@ app.listen(port, "0.0.0.0", async () => {
     }
   } catch (error) {
     console.error("❌ Error seeding products:", error);
+    // Don't exit - server can still handle other requests
   }
 });
