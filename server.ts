@@ -21,6 +21,7 @@ import healthDataRoutes from "./src/routes/healthData.routes";
 import elevenlabsRoutes from "./src/routes/elevenLabs.routes";
 import webhookRoutes from "./src/routes/webhook.routes";
 import { rookWebhookService } from "./src/services/webhooks.service";
+import profileRoutes from './src/routes/profile.routes';
 
 // Initialize Firebase Admin
 initializeFirebaseAdmin();
@@ -80,7 +81,7 @@ app.use("/api/tts", ttsRoutes);
 app.use("/api/stt", sttRoutes);
 app.use("/api/health-data", healthDataRoutes);
 app.use("/api/elevenlabs", elevenlabsRoutes);
-
+app.use('/api/profile', profileRoutes);
 // WEBHOOK ROUTES (No authentication required - validated via HMAC)
 app.use("/api/webhooks/rook", webhookRoutes);
 

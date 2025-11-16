@@ -17,10 +17,9 @@ export interface IUser extends Document {
   firebaseUid: string;
   email: string;
   fullName?: string;
-  phone?: string; // For phone/email login option
+  phone?: string; 
   displayName?: string;
-  photoURL?: string;
-  provider: string; // 'password', 'google.com', 'apple.com'
+  provider: string; 
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
   createdAt: Date;
@@ -28,8 +27,9 @@ export interface IUser extends Document {
   lastLoginAt: Date;
   isActive: boolean;
   onboardingCompleted: boolean;
-  profileCompleted: boolean; // Track if user completed profile setup
-  wearables?: Record<string, IWearableConnection>; // Wearable connection status (renamed from wearableConnections)
+  profileCompleted: boolean; 
+  wearables?: Record<string, IWearableConnection>; 
+  photoURL?: string;
 }
 
 // MongoDB schema definition
