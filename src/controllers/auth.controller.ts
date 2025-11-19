@@ -148,6 +148,7 @@ export class AuthController {
         email: user.email,
         fullName: user.fullName,
         displayName: user.displayName,
+        photoURL: user.photoURL,
         isEmailVerified: user.isEmailVerified,
         profileCompleted: user.profileCompleted,
         onboardingCompleted: user.onboardingCompleted,

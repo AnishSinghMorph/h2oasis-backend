@@ -17,6 +17,7 @@ const initializeFirebaseAdmin = (): void => {
     
     if (fs.existsSync(serviceAccountPath)) {
       // Use service account JSON file
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const serviceAccount = require(serviceAccountPath);
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
