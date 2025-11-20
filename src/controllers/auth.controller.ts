@@ -8,54 +8,91 @@ import redis from "../utils/redis";
 
 export class AuthController {
   static async register(req: Request, res: Response) {
-    const { fullName, email, password } = req.body;
+    const { fullName, email, password, firebaseUid, provider } = req.body;
 
-    // Validate input
-    if (!fullName || !email || !password) {
-      return res.status(400).json({
+    try {
+      // Connect to database
+      await DatabaseService.connect();
+
+      // Handle social sign-in (Apple, Google, etc.)
+      if (firebaseUid && provider && provider !== "password") {
+        // User already authenticated with Firebase via social provider
+        // Just create/update in MongoDB
+        const userData = {
+          firebaseUid,
+          email: email || "",
+          fullName: fullName || "User",
+          displayName: fullName || "User",
+          provider,
+        };
+
+        const user = await AuthService.createOrUpdateUser(userData);
+
+        return res.status(201).json({
+          success: true,
+          message: "User registered successfully",
+          firebaseUID: user.firebaseUid,
+          user: {
+            id: user._id,
+            email: user.email,
+            fullName: user.fullName,
+            displayName: user.displayName,
+            provider: user.provider,
+          },
+        });
+      }
+
+      // Handle password-based registration
+      if (!fullName || !email || !password) {
+        return res.status(400).json({
+          success: false,
+          message: "Full name, email, and password are required",
+        });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: "Password must be at least 6 characters long",
+        });
+      }
+
+      // Create user in Firebase Auth
+      const firebaseUser = await admin.auth().createUser({
+        email,
+        password,
+        displayName: fullName,
+      });
+
+      // Create user in MongoDB
+      const userData = {
+        firebaseUid: firebaseUser.uid,
+        email,
+        fullName,
+        displayName: fullName,
+        provider: "password",
+      };
+
+      const user = await AuthService.createOrUpdateUser(userData);
+
+      return res.status(201).json({
+        success: true,
+        message: "User registered successfully",
+        firebaseUID: user.firebaseUid,
+        user: {
+          id: user._id,
+          email: user.email,
+          fullName: user.fullName,
+          displayName: user.displayName,
+        },
+      });
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      return res.status(500).json({
         success: false,
-        message: "Full name, email, and password are required",
+        message: error.message || "Registration failed",
       });
     }
-
-    if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: "Password must be at least 6 characters long",
-      });
-    }
-
-    // Create user in Firebase Auth
-    const firebaseUser = await admin.auth().createUser({
-      email,
-      password,
-      displayName: fullName,
-    });
-
-    // Connect to database
-    await DatabaseService.connect();
-
-    // Create user in MongoDB
-    const userData = {
-      firebaseUid: firebaseUser.uid,
-      email,
-      fullName,
-      displayName: fullName,
-      provider: "password",
-    };
-
-    const user = await AuthService.createOrUpdateUser(userData);
-
-    return res.status(201).json({
-      success: true,
-      message: "User registered successfully",
-      user: {
-        id: user._id,
-        email: user.email,
-        fullName: user.fullName,
-        displayName: user.displayName,
-      },
-    });
   }
 
   static async login(req: Request, res: Response) {
