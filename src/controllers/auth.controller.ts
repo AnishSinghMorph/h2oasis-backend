@@ -8,9 +8,39 @@ import redis from "../utils/redis";
 
 export class AuthController {
   static async register(req: Request, res: Response) {
-    const { fullName, email, password } = req.body;
+    const { fullName, email, password, firebaseUid, provider } = req.body;
 
-    // Validate input
+    // Check if this is OAuth sign-in (Apple/Google)
+    const isOAuth = firebaseUid && provider && provider !== "password";
+
+    if (isOAuth) {
+      // OAuth flow - user already exists in Firebase
+      // Just create/update in MongoDB
+      await DatabaseService.connect();
+
+      const userData = {
+        firebaseUid,
+        email,
+        fullName,
+        displayName: fullName,
+        provider,
+      };
+
+      const user = await AuthService.createOrUpdateUser(userData);
+
+      return res.status(201).json({
+        success: true,
+        message: "User registered successfully",
+        user: {
+          id: user._id,
+          email: user.email,
+          fullName: user.fullName,
+          displayName: user.displayName,
+        },
+      });
+    }
+
+    // Password-based registration flow
     if (!fullName || !email || !password) {
       return res.status(400).json({
         success: false,
