@@ -26,7 +26,7 @@ export class RookWebhookService {
     const baseUrl =
       process.env.WEBHOOK_BASE_URL ||
       process.env.BASE_URL ||
-      "https://your-domain.com";
+      "https://api.h2oasis.ai";
 
     return {
       healthDataWebhook: `${baseUrl}/api/webhooks/rook/health-data`,

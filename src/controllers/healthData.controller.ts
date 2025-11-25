@@ -551,9 +551,9 @@ export const getRookAuthURL = async (
     const secretKey = process.env.ROOK_SANDBOX_SECRET_KEY;
     const baseUrl =
       process.env.ROOK_SANDBOX_BASE_URL || "https://api.rook-connect.review";
-
-    // Get redirect URL from environment
-    const redirectUri = process.env.EXPO_PUBLIC_OAUTH_REDIRECT_URL;
+    
+    // Get redirect URL from environment (for production callback)
+    const redirectUri = process.env.OAUTH_REDIRECT_URL;
 
     if (!clientUUID || !secretKey) {
       res.status(500).json({
@@ -563,16 +563,11 @@ export const getRookAuthURL = async (
       return;
     }
 
-    if (!redirectUri) {
-      res.status(500).json({
-        success: false,
-        error: "OAuth redirect URL not configured on server",
-      });
-      return;
-    }
-
     // Call ROOK API to get authorization URL
-    const url = `${baseUrl}/api/v1/user_id/${mongoUserId}/data_source/${dataSource}/authorizer?redirect_url=${encodeURIComponent(redirectUri)}`;
+    // If redirectUri is provided, use it. Otherwise ROOK uses their default callback
+    const url = redirectUri 
+      ? `${baseUrl}/api/v1/user_id/${mongoUserId}/data_source/${dataSource}/authorizer?redirect_url=${encodeURIComponent(redirectUri)}`
+      : `${baseUrl}/api/v1/user_id/${mongoUserId}/data_source/${dataSource}/authorizer`;
 
     const credentials = `${clientUUID}:${secretKey}`;
     const basicAuth = Buffer.from(credentials).toString("base64");
