@@ -130,7 +130,9 @@ export class AuthController {
           lastLoginAt: userDoc.lastLoginAt,
           _id: userDoc._id,
         };
-        await redis.set(cacheKey, JSON.stringify(userForResponse), "EX", 3600);
+        await redis.set(cacheKey, JSON.stringify(userForResponse), {
+          EX: 3600,
+        });
       }
     }
 

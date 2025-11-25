@@ -11,7 +11,7 @@ import { DatabaseService } from "../utils/database";
 export const ensureDbConnection = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     // Skip database check for health endpoints and static files
@@ -21,12 +21,12 @@ export const ensureDbConnection = async (
 
     // Check if connection is healthy
     const isConnected = DatabaseService.getConnectionStatus();
-    
+
     if (!isConnected) {
       console.log("⚠️ Database connection lost, attempting to reconnect...");
       await DatabaseService.connect();
     }
-    
+
     next();
   } catch (error) {
     console.error("❌ Failed to establish database connection:", error);

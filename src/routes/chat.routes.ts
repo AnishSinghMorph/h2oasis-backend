@@ -57,38 +57,7 @@ router.post("/message", async (req: Request, res: Response) => {
   await chatController.sendMessage(req as any, res);
 });
 
-/**
- * @swagger
- * /api/chat/health-context/{userId}:
- *   get:
- *     summary: Get health context for AI
- *     description: Retrieve user's health data to provide context for AI conversations
- *     tags: [Chat]
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
- *         description: Firebase UID
- *     responses:
- *       200:
- *         description: Health context retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 healthData:
- *                   type: object
- *       404:
- *         description: User not found
- */
-router.get("/health-context/:userId", async (req: Request, res: Response) => {
-  await chatController.getHealthContext(req, res);
-});
+// Removed /health-context/:userId endpoint - now using real data from /api/health-data
 
 /**
  * @swagger

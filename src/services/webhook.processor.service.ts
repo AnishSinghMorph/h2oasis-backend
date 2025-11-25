@@ -2,6 +2,7 @@ import { User } from "../models/User.model";
 import { HealthDataTransformer } from "./healthData.transformer.service";
 import { HealthDataMerger } from "./healthData.merger.service";
 import { IRookWebhookPayload } from "../models/HealthData.types";
+import redisClient from "../utils/redis";
 
 /**
  * Webhook Processor Service
@@ -122,6 +123,16 @@ export class WebhookProcessor {
       console.log(
         `✅ Clean health data saved for ${wearableName} (${dataType})`,
       );
+
+      // 🔥 INVALIDATE REDIS CACHE - Force fresh data on next chat request
+      try {
+        const cacheKey = `wearables:${userId}`;
+        await redisClient.del(cacheKey);
+        console.log(`🗑️ Cleared Redis cache for user ${userId}`);
+      } catch (error) {
+        console.warn("⚠️ Failed to clear Redis cache:", error);
+        // Don't fail webhook if cache clear fails
+      }
 
       // Verify what was actually saved
       const savedData =

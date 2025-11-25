@@ -1,4 +1,3 @@
-
 import { Request, Response, NextFunction } from "express";
 import mongoose from "mongoose";
 
@@ -27,7 +26,11 @@ export const errorHandler = (
     });
   }
 
-  if (error.name === "MongooseError" || error.name === "MongoError" || error.name === "MongoServerError") {
+  if (
+    error.name === "MongooseError" ||
+    error.name === "MongoError" ||
+    error.name === "MongoServerError"
+  ) {
     console.error("❌ Database error:", error);
     return res.status(503).json({
       success: false,
@@ -37,9 +40,11 @@ export const errorHandler = (
   }
 
   // Handle connection closed errors specifically
-  if (error.message?.includes("Connection is closed") || 
-      error.message?.includes("topology was destroyed") ||
-      error.message?.includes("pool was destroyed")) {
+  if (
+    error.message?.includes("Connection is closed") ||
+    error.message?.includes("topology was destroyed") ||
+    error.message?.includes("pool was destroyed")
+  ) {
     return res.status(503).json({
       success: false,
       message: "Database connection lost. Please try again.",

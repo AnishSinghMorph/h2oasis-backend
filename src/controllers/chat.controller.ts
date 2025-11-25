@@ -1,17 +1,24 @@
 import { Request, Response } from "express";
-import { OpenAIService } from "../services/openai.service";
+import { H2OasisAIService } from "../services/h2oasis-ai.service";
+import { User } from "../models/User.model";
+import { UserSelection } from "../models/UserSelection.model";
+import redisClient from "../utils/redis";
 
 export class ChatController {
-  private openAIService: OpenAIService;
+  private h2oasisAI: H2OasisAIService;
+  private readonly CACHE_TTL = 300; // 5 minutes cache
 
   constructor() {
-    this.openAIService = new OpenAIService();
+    this.h2oasisAI = new H2OasisAIService();
   }
 
   sendMessage = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { message, userId, healthData, productContext, chatHistory } =
+      const { message, chatHistory, tags, goals, mood, isNewSession } =
         req.body;
+
+      // Get userId from auth middleware
+      const userId = req.headers["x-firebase-uid"] as string;
 
       // Validate required fields
       if (!message || !userId) {
@@ -21,53 +28,42 @@ export class ChatController {
         return;
       }
 
-      // Default product context if not provided
-      const defaultProductContext = {
-        productName: "H2Oasis Recovery System",
-        productType: "recovery_suite" as const,
-        features: ["Cold Plunge", "Hot Tub", "Sauna"],
-      };
+      console.log("💬 Processing chat message for user:", userId);
 
-      // Convert chat history timestamps
-      const formattedChatHistory = chatHistory?.map((msg: any) => ({
-        role: msg.role,
-        content: msg.content,
-        timestamp: new Date(msg.timestamp),
-      }));
+      // Fetch user's wearables data (with caching)
+      const wearablesData = await this.getWearablesDataCached(userId);
 
-      // Build context for OpenAI
-      const context = {
-        healthData: healthData || {},
-        productContext: productContext || defaultProductContext,
-        userMessage: message,
-        chatHistory: formattedChatHistory,
-        userId,
-      };
+      // Build messages array for H2Oasis AI
+      const messages = [
+        ...(chatHistory || []),
+        {
+          role: "user" as const,
+          content: message,
+        },
+      ];
 
-      // Generate AI response
-      const aiResponse = await this.openAIService.generateResponse(context);
+      // Call H2Oasis AI API
+      const aiResponse = await this.h2oasisAI.sendMessage(
+        message,
+        messages,
+        wearablesData,
+        {
+          tags,
+          goals,
+          mood,
+          isNewSession,
+        },
+      );
 
-      // Check if response contains action marker
-      const hasAction = aiResponse.includes("[ACTION:CREATE_PLAN]");
-      const cleanResponse = aiResponse
-        .replace("[ACTION:CREATE_PLAN]", "")
-        .trim();
-
-      // Save chat message to database (implement this later)
-      // await this.saveChatMessage(userId, message, aiResponse);
+      console.log("✅ AI response received");
 
       res.json({
         success: true,
-        response: cleanResponse,
+        response: aiResponse,
         timestamp: new Date().toISOString(),
-        action: hasAction ? "CREATE_PLAN" : null,
-        context: {
-          healthDataReceived: !!healthData,
-          productContext: context.productContext,
-        },
       });
     } catch (error) {
-      console.error("Chat controller error:", error);
+      console.error("❌ Chat controller error:", error);
       res.status(500).json({
         error: "Failed to process chat message",
         message:
@@ -76,44 +72,199 @@ export class ChatController {
     }
   };
 
-  getHealthContext = async (req: Request, res: Response): Promise<void> => {
+  /**
+   * Get wearables data with Redis caching
+   * Caches for 5 minutes to avoid repeated DB queries
+   */
+  private async getWearablesDataCached(userId: string) {
+    const cacheKey = `wearables:${userId}`;
+
     try {
-      const { userId } = req.params;
-
-      if (!userId) {
-        res.status(400).json({
-          error: "userId is required",
-        });
-        return;
+      // Try to get from Redis cache first
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        console.log("📦 Using cached wearables data");
+        return JSON.parse(cached);
       }
-
-      // TODO: Integrate with ROOK API to fetch real health data
-      // For now, return mock data structure
-      const mockHealthData = {
-        steps: 8500,
-        heartRate: 72,
-        restingHeartRate: 58,
-        sleepHours: 7.5,
-        calories: 2200,
-        activeMinutes: 45,
-        hrv: 42,
-        stressLevel: 3,
-        bloodOxygen: 98,
-        lastUpdated: new Date().toISOString(),
-      };
-
-      res.json({
-        success: true,
-        healthData: mockHealthData,
-        userId,
-      });
     } catch (error) {
-      console.error("Health context error:", error);
-      res.status(500).json({
-        error: "Failed to fetch health context",
-      });
+      console.warn("⚠️ Redis cache read failed, fetching from DB:", error);
     }
-  };
+
+    // Fetch fresh data from database
+    console.log("🔄 Fetching fresh wearables data from MongoDB");
+    const wearablesData = await this.getWearablesData(userId);
+
+    try {
+      // Store in Redis cache
+      await redisClient.set(cacheKey, JSON.stringify(wearablesData), {
+        EX: this.CACHE_TTL,
+      });
+      console.log("💾 Cached wearables data for 5 minutes");
+    } catch (error) {
+      console.warn("⚠️ Redis cache write failed:", error);
+    }
+
+    return wearablesData;
+  }
+
+  /**
+   * Get wearables data in H2Oasis AI format
+   */
+  private async getWearablesData(userId: string) {
+    try {
+      // Get user profile
+      const user = await User.findOne({ firebaseUid: userId });
+
+      // Get user's product selection
+      const userSelection = (await UserSelection.findOne({ userId }).populate(
+        "productId",
+      )) as any;
+
+      // Get user's wearable connection statuses from database
+      const wearables = user?.wearables || {};
+
+      // Check if any wearable is connected
+      const hasConnectedWearables = Object.values(wearables).some(
+        (w: any) => w?.connected,
+      );
+
+      // Return in H2Oasis AI format
+      return {
+        success: hasConnectedWearables,
+        data: {
+          userId,
+          profile: {
+            name: user?.fullName || user?.displayName,
+            email: user?.email,
+            uid: userId,
+          },
+          selectedProduct: userSelection
+            ? {
+                id: userSelection.productId._id.toString(),
+                name: userSelection.productId.name,
+                type: userSelection.productId.type,
+                selectedAt: userSelection.selectedAt.toISOString(),
+              }
+            : {
+                id: "unspecified",
+                name: "Unspecified",
+                type: "unspecified",
+                selectedAt: new Date().toISOString(),
+              },
+          wearables: {
+            apple: {
+              id: "apple",
+              name: "Apple Health",
+              type: "sdk",
+              connected: wearables.apple?.connected || false,
+              data: wearables.apple?.data || null,
+            },
+            samsung: {
+              id: "samsung",
+              name: "Samsung Health",
+              type: "sdk",
+              connected: wearables.samsung?.connected || false,
+              data: wearables.samsung?.data || null,
+            },
+            garmin: {
+              id: "garmin",
+              name: "Garmin",
+              type: "api",
+              connected: wearables.garmin?.connected || false,
+              data: wearables.garmin?.data || null,
+            },
+            fitbit: {
+              id: "fitbit",
+              name: "Fitbit",
+              type: "api",
+              connected: wearables.fitbit?.connected || false,
+              data: wearables.fitbit?.data || null,
+            },
+            whoop: {
+              id: "whoop",
+              name: "Whoop",
+              type: "api",
+              connected: wearables.whoop?.connected || false,
+              data: wearables.whoop?.data || null,
+            },
+            oura: {
+              id: "oura",
+              name: "Oura Ring",
+              type: "api",
+              connected: wearables.oura?.connected || false,
+              data: wearables.oura?.data || null,
+            },
+          },
+          lastSync: new Date().toISOString(),
+        },
+      };
+    } catch (error) {
+      console.error("❌ Error fetching wearables data:", error);
+      // Return empty structure if error
+      return {
+        success: false,
+        data: {
+          userId,
+          profile: {
+            uid: userId,
+          },
+          selectedProduct: {
+            id: "unspecified",
+            name: "Unspecified",
+            type: "unspecified",
+            selectedAt: new Date().toISOString(),
+          },
+          wearables: {
+            apple: {
+              id: "apple",
+              name: "Apple Health",
+              type: "sdk",
+              connected: false,
+              data: null,
+            },
+            samsung: {
+              id: "samsung",
+              name: "Samsung Health",
+              type: "sdk",
+              connected: false,
+              data: null,
+            },
+            garmin: {
+              id: "garmin",
+              name: "Garmin",
+              type: "api",
+              connected: false,
+              data: null,
+            },
+            fitbit: {
+              id: "fitbit",
+              name: "Fitbit",
+              type: "api",
+              connected: false,
+              data: null,
+            },
+            whoop: {
+              id: "whoop",
+              name: "Whoop",
+              type: "api",
+              connected: false,
+              data: null,
+            },
+            oura: {
+              id: "oura",
+              name: "Oura Ring",
+              type: "api",
+              connected: false,
+              data: null,
+            },
+          },
+          lastSync: new Date().toISOString(),
+        },
+      };
+    }
+  }
+
+  // Removed getHealthContext - we now use getWearablesData() which fetches real data from database
 
   // Future method to save chat history
   private async saveChatMessage(
@@ -129,7 +280,10 @@ export class ChatController {
 
   generatePlan = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { userId, healthData, productContext } = req.body;
+      const { chatHistory } = req.body;
+
+      // Get userId from auth middleware
+      const userId = req.headers["x-firebase-uid"] as string;
 
       if (!userId) {
         res.status(400).json({
@@ -140,24 +294,27 @@ export class ChatController {
 
       console.log("📋 Generating recovery plan for user:", userId);
 
-      // Default product context if not provided
-      const defaultProductContext = {
-        productName: "H2Oasis Recovery System",
-        productType: "recovery_suite" as const,
-        features: ["Cold Plunge", "Hot Tub", "Sauna"],
-      };
+      // Fetch user's wearables data from database
+      const wearablesData = await this.getWearablesData(userId);
 
-      // Build context for plan generation
-      const context = {
-        healthData: healthData || {},
-        productContext: productContext || defaultProductContext,
-        userMessage: "Generate my recovery plan",
-        userId,
-      };
+      // Build messages for plan generation
+      const planRequestMessage =
+        "Generate a personalized recovery plan for me based on my health data and goals.";
 
-      // Generate personalized recovery plan
-      const recoveryPlan =
-        await this.openAIService.generateRecoveryPlan(context);
+      const messages = [
+        ...(chatHistory || []),
+        {
+          role: "user" as const,
+          content: planRequestMessage,
+        },
+      ];
+
+      // Call H2Oasis AI API to generate plan
+      const recoveryPlan = await this.h2oasisAI.sendMessage(
+        planRequestMessage,
+        messages,
+        wearablesData,
+      );
 
       console.log("✅ Recovery plan generated");
 
@@ -167,7 +324,7 @@ export class ChatController {
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      console.error("Plan generation error:", error);
+      console.error("❌ Plan generation error:", error);
       res.status(500).json({
         error: "Failed to generate recovery plan",
         message: "Unable to create plan. Please try again.",

@@ -17,9 +17,9 @@ export interface IUser extends Document {
   firebaseUid: string;
   email: string;
   fullName?: string;
-  phone?: string; 
+  phone?: string;
   displayName?: string;
-  provider: string; 
+  provider: string;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
   createdAt: Date;
@@ -27,8 +27,8 @@ export interface IUser extends Document {
   lastLoginAt: Date;
   isActive: boolean;
   onboardingCompleted: boolean;
-  profileCompleted: boolean; 
-  wearables?: Record<string, IWearableConnection>; 
+  profileCompleted: boolean;
+  wearables?: Record<string, IWearableConnection>;
   photoURL?: string;
 }
 

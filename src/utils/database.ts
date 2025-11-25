@@ -36,7 +36,7 @@ export class DatabaseService {
       }
 
       console.log("🔄 Connecting to MongoDB...");
-      
+
       await mongoose.connect(mongoUri, {
         maxPoolSize: 10,
         minPoolSize: 2,
@@ -77,22 +77,27 @@ export class DatabaseService {
     mongoose.connection.on("disconnected", () => {
       console.log("⚠️ MongoDB disconnected");
       this.isConnected = false;
-      
+
       // Auto-reconnect with exponential backoff
       if (this.reconnectAttempts < this.MAX_RECONNECT_ATTEMPTS) {
         this.reconnectAttempts++;
-        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-        console.log(
-          `🔄 Attempting reconnection ${this.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS} in ${delay}ms...`
+        const delay = Math.min(
+          1000 * Math.pow(2, this.reconnectAttempts),
+          30000,
         );
-        
+        console.log(
+          `🔄 Attempting reconnection ${this.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS} in ${delay}ms...`,
+        );
+
         setTimeout(() => {
           this.connect().catch((err) =>
-            console.error("❌ Reconnection attempt failed:", err)
+            console.error("❌ Reconnection attempt failed:", err),
           );
         }, delay);
       } else {
-        console.error("❌ Max reconnection attempts reached. Manual intervention required.");
+        console.error(
+          "❌ Max reconnection attempts reached. Manual intervention required.",
+        );
       }
     });
 
@@ -105,12 +110,14 @@ export class DatabaseService {
 
   private static async waitForConnection(timeout = 10000): Promise<void> {
     const startTime = Date.now();
-    
+
     while (this.isConnecting) {
       if (Date.now() - startTime > timeout) {
-        throw new Error("Connection timeout: Database connection taking too long");
+        throw new Error(
+          "Connection timeout: Database connection taking too long",
+        );
       }
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
     if (!this.isConnected) {

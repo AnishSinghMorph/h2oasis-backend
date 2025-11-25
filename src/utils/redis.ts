@@ -1,20 +1,33 @@
-/**
- * Redis Mock - Temporarily disabled
- * Redis is not available on AWS right now, so we're using a mock that does nothing
- * Caching is completely disabled until Redis is set up
- */
+import { createClient } from "redis";
 
-console.log('⚠️ Redis disabled - no caching (this is temporary)');
+const redisClient = createClient({
+  url: process.env.REDIS_URL || "redis://localhost:6379",
+  socket: {
+    reconnectStrategy: (retries: number) => {
+      if (retries > 10) {
+        console.error("❌ Redis connection failed after 10 retries");
+        return new Error("Redis connection failed");
+      }
+      return retries * 100; // Reconnect after retries * 100ms
+    },
+  },
+});
 
-// Mock Redis client that accepts all parameters but does nothing
-const mockRedis = {
-  get: async (key: string) => null,
-  set: async (key: string, value: string, ...args: any[]) => 'OK',
-  del: async (key: string) => 1,
-  expire: async (key: string, seconds: number) => 1,
-  on: (event: string, handler: any) => {},
-  connect: async () => {},
-  disconnect: async () => {},
-};
+redisClient.on("error", (err: Error) => {
+  console.error("❌ Redis Client Error:", err);
+});
 
-export default mockRedis;
+redisClient.on("connect", () => {
+  console.log("✅ Redis connected successfully");
+});
+
+// Connect to Redis
+(async () => {
+  try {
+    await redisClient.connect();
+  } catch (error) {
+    console.error("❌ Failed to connect to Redis:", error);
+  }
+})();
+
+export default redisClient;
