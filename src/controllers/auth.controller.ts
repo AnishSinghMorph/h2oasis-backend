@@ -11,7 +11,6 @@ export class AuthController {
     const { fullName, email, password, firebaseUid, provider } = req.body;
 
     try {
-      // Connect to database
       await DatabaseService.connect();
 
       // Handle social sign-in (Apple, Google, etc.)
@@ -39,6 +38,7 @@ export class AuthController {
             displayName: user.displayName,
             provider: user.provider,
           },
+          linkedProviders: Array.from(user.linkedProviders?.keys() || [])
         });
       }
 
@@ -58,11 +58,36 @@ export class AuthController {
       }
 
       // Create user in Firebase Auth
-      const firebaseUser = await admin.auth().createUser({
-        email,
-        password,
-        displayName: fullName,
-      });
+      let firebaseUser;
+      try {
+        firebaseUser = await admin.auth().createUser({
+          email,
+          password,
+          displayName: fullName,
+        });
+      } catch (firebaseError: any) {
+        // If email already exists, try to get the existing user and link password
+        if (firebaseError.code === 'auth/email-already-exists') {
+          try {
+            // Get existing Firebase user by email
+            const existingUser = await admin.auth().getUserByEmail(email);
+            
+            // Update the existing user with password
+            firebaseUser = await admin.auth().updateUser(existingUser.uid, {
+              password: password,
+            });
+            
+            console.log(`✅ Added password to existing account: ${email}`);
+          } catch (updateError: any) {
+            return res.status(400).json({
+              success: false,
+              message: "This email is already registered with another provider. Please sign in with that provider first.",
+            });
+          }
+        } else {
+          throw firebaseError;
+        }
+      }
 
       // Create user in MongoDB
       const userData = {
@@ -85,6 +110,7 @@ export class AuthController {
           fullName: user.fullName,
           displayName: user.displayName,
         },
+          linkedProviders: Array.from(user.linkedProviders?.keys() || []),
       });
     } catch (error: any) {
       console.error("Registration error:", error);
@@ -165,6 +191,7 @@ export class AuthController {
         fullName: userDoc.fullName,
         displayName: userDoc.displayName,
       },
+       linkedProviders: Array.from(userDoc.linkedProviders?.keys() || []),
     });
   }
 
@@ -191,6 +218,7 @@ export class AuthController {
         isEmailVerified: user.isEmailVerified,
         profileCompleted: user.profileCompleted,
         onboardingCompleted: user.onboardingCompleted,
+        linkedProviders: Array.from(user.linkedProviders?.keys() || []),
       },
     });
   }

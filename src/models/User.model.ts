@@ -1,18 +1,18 @@
 import mongoose, { Document, Schema } from "mongoose";
 import { IHealthData } from "./HealthData.types";
 
-// Wearable connection interface
+
 export interface IWearableConnection {
   id: string;
   name: string;
-  type: "sdk" | "api"; // SDK = native mobile, API = ROOK integration
+  type: "sdk" | "api"; 
   connected: boolean;
   lastSync?: Date;
   connectedAt?: Date;
-  data: IHealthData | null; // Changed from healthData to data to match client format
+  data: IHealthData | null; 
 }
 
-// User interface for TypeScript
+
 export interface IUser extends Document {
   firebaseUid: string;
   email: string;
@@ -20,6 +20,7 @@ export interface IUser extends Document {
   phone?: string;
   displayName?: string;
   provider: string;
+  linkedProviders?: Map<string, string>;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
   createdAt: Date;
@@ -32,7 +33,7 @@ export interface IUser extends Document {
   photoURL?: string;
 }
 
-// MongoDB schema definition
+
 const UserSchema = new Schema<IUser>(
   {
     firebaseUid: {
@@ -59,7 +60,7 @@ const UserSchema = new Schema<IUser>(
     },
     phone: {
       type: String,
-      sparse: true, // Allows multiple null values but unique non-null values
+      sparse: true,
       index: true,
       match: [/^\+?[\d\s\-()]+$/, "Please enter a valid phone number"],
     },
@@ -84,6 +85,11 @@ const UserSchema = new Schema<IUser>(
         values: ["password", "google.com", "apple.com"],
         message: "Provider must be password, google.com, or apple.com",
       },
+    },
+    linkedProviders: {
+      type: Map,
+      of: String,
+      default: () => new Map(),
     },
     isEmailVerified: {
       type: Boolean,
@@ -112,27 +118,25 @@ const UserSchema = new Schema<IUser>(
     },
   },
   {
-    timestamps: true, // Adds createdAt and updatedAt automatically
+    timestamps: true, 
     collection: "users",
   },
 );
 
-// Additional indexes for better query performance (not duplicating field-level indexes)
+
 UserSchema.index({ provider: 1 });
 UserSchema.index({ isActive: 1 });
 
-// Virtual for full name display
+
 UserSchema.virtual("fullDisplayName").get(function () {
   return this.fullName || this.displayName || this.email.split("@")[0];
 });
 
-// Pre-save middleware to set profileCompleted status
+
 UserSchema.pre("save", function (next) {
   if (this.provider === "password") {
-    // For email/password users, profile is complete when email is verified
     this.profileCompleted = this.isEmailVerified;
   } else {
-    // For social logins, profile is usually complete on creation
     this.profileCompleted = true;
   }
   next();
