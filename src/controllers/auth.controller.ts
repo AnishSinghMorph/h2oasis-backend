@@ -39,7 +39,7 @@ export class AuthController {
             displayName: user.displayName,
             provider: user.provider,
           },
-          linkedProviders: Array.from(user.linkedProviders?.keys() || []),
+          linkedProviders: Array.from(user.linkedProviders?.keys() || [])
         });
       }
 
@@ -58,6 +58,16 @@ export class AuthController {
         });
       }
 
+      // Check if user already exists in MongoDB with verified email
+      const existingUser = await User.findOne({ email: email.toLowerCase() });
+      if (existingUser && existingUser.isEmailVerified) {
+        return res.status(409).json({
+          success: false,
+          message: "An account with this email already exists. Please login instead.",
+          code: "EMAIL_EXISTS",
+        });
+      }
+
       // Create user in Firebase Auth
       let firebaseUser;
       try {
@@ -68,22 +78,21 @@ export class AuthController {
         });
       } catch (firebaseError: any) {
         // If email already exists, try to get the existing user and link password
-        if (firebaseError.code === "auth/email-already-exists") {
+        if (firebaseError.code === 'auth/email-already-exists') {
           try {
             // Get existing Firebase user by email
             const existingUser = await admin.auth().getUserByEmail(email);
-
+            
             // Update the existing user with password
             firebaseUser = await admin.auth().updateUser(existingUser.uid, {
               password: password,
             });
-
+            
             console.log(`✅ Added password to existing account: ${email}`);
           } catch (updateError: any) {
             return res.status(400).json({
               success: false,
-              message:
-                "This email is already registered with another provider. Please sign in with that provider first.",
+              message: "This email is already registered with another provider. Please sign in with that provider first.",
             });
           }
         } else {
@@ -102,6 +111,7 @@ export class AuthController {
 
       const user = await AuthService.createOrUpdateUser(userData);
 
+
       // Generate OTP and send email for password users
       const otp = generateOTP();
       user.emailOtp = otp;
@@ -119,8 +129,8 @@ export class AuthController {
           fullName: user.fullName,
           displayName: user.displayName,
         },
-        linkedProviders: Array.from(user.linkedProviders?.keys() || []),
-        requiresEmailVerification: true,
+          linkedProviders: Array.from(user.linkedProviders?.keys() || []),
+                requiresEmailVerification: true,
       });
     } catch (error: any) {
       console.error("Registration error:", error);
@@ -201,7 +211,7 @@ export class AuthController {
         fullName: userDoc.fullName,
         displayName: userDoc.displayName,
       },
-      linkedProviders: Array.from(userDoc.linkedProviders?.keys() || []),
+       linkedProviders: Array.from(userDoc.linkedProviders?.keys() || []),
     });
   }
 
@@ -314,7 +324,7 @@ export class AuthController {
         success: false,
         message: error.message || "Verification failed",
       });
-    }
+   3 }
   }
 
   static async requestOTP(req: Request, res: Response) {
