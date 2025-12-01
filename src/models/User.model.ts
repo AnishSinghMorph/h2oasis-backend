@@ -1,17 +1,15 @@
 import mongoose, { Document, Schema } from "mongoose";
 import { IHealthData } from "./HealthData.types";
 
-
 export interface IWearableConnection {
   id: string;
   name: string;
-  type: "sdk" | "api"; 
+  type: "sdk" | "api";
   connected: boolean;
   lastSync?: Date;
   connectedAt?: Date;
-  data: IHealthData | null; 
+  data: IHealthData | null;
 }
-
 
 export interface IUser extends Document {
   firebaseUid: string;
@@ -31,8 +29,9 @@ export interface IUser extends Document {
   profileCompleted: boolean;
   wearables?: Record<string, IWearableConnection>;
   photoURL?: string;
+  emailOtp?: string;
+  emailOtpExpiry?: Date;
 }
-
 
 const UserSchema = new Schema<IUser>(
   {
@@ -116,22 +115,21 @@ const UserSchema = new Schema<IUser>(
       type: Schema.Types.Mixed,
       default: {},
     },
+    emailOtp: { type: String },
+    emailOtpExpiry: { type: Date },
   },
   {
-    timestamps: true, 
+    timestamps: true,
     collection: "users",
   },
 );
 
-
 UserSchema.index({ provider: 1 });
 UserSchema.index({ isActive: 1 });
-
 
 UserSchema.virtual("fullDisplayName").get(function () {
   return this.fullName || this.displayName || this.email.split("@")[0];
 });
-
 
 UserSchema.pre("save", function (next) {
   if (this.provider === "password") {

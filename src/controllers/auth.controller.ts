@@ -5,6 +5,7 @@ import { User } from "../models/User.model";
 import { admin } from "../utils/firebase";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 import redis from "../utils/redis";
+import { generateOTP, sendOTPEmail } from "../services/otp.service";
 
 export class AuthController {
   static async register(req: Request, res: Response) {
@@ -38,7 +39,7 @@ export class AuthController {
             displayName: user.displayName,
             provider: user.provider,
           },
-          linkedProviders: Array.from(user.linkedProviders?.keys() || [])
+          linkedProviders: Array.from(user.linkedProviders?.keys() || []),
         });
       }
 
@@ -67,21 +68,22 @@ export class AuthController {
         });
       } catch (firebaseError: any) {
         // If email already exists, try to get the existing user and link password
-        if (firebaseError.code === 'auth/email-already-exists') {
+        if (firebaseError.code === "auth/email-already-exists") {
           try {
             // Get existing Firebase user by email
             const existingUser = await admin.auth().getUserByEmail(email);
-            
+
             // Update the existing user with password
             firebaseUser = await admin.auth().updateUser(existingUser.uid, {
               password: password,
             });
-            
+
             console.log(`✅ Added password to existing account: ${email}`);
           } catch (updateError: any) {
             return res.status(400).json({
               success: false,
-              message: "This email is already registered with another provider. Please sign in with that provider first.",
+              message:
+                "This email is already registered with another provider. Please sign in with that provider first.",
             });
           }
         } else {
@@ -100,6 +102,13 @@ export class AuthController {
 
       const user = await AuthService.createOrUpdateUser(userData);
 
+      // Generate OTP and send email for password users
+      const otp = generateOTP();
+      user.emailOtp = otp;
+      user.emailOtpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+      await user.save();
+      await sendOTPEmail(user.email, otp, user.fullName || "there");
+
       return res.status(201).json({
         success: true,
         message: "User registered successfully",
@@ -110,7 +119,8 @@ export class AuthController {
           fullName: user.fullName,
           displayName: user.displayName,
         },
-          linkedProviders: Array.from(user.linkedProviders?.keys() || []),
+        linkedProviders: Array.from(user.linkedProviders?.keys() || []),
+        requiresEmailVerification: true,
       });
     } catch (error: any) {
       console.error("Registration error:", error);
@@ -191,7 +201,7 @@ export class AuthController {
         fullName: userDoc.fullName,
         displayName: userDoc.displayName,
       },
-       linkedProviders: Array.from(userDoc.linkedProviders?.keys() || []),
+      linkedProviders: Array.from(userDoc.linkedProviders?.keys() || []),
     });
   }
 
@@ -249,5 +259,103 @@ export class AuthController {
         onboardingCompleted: user.onboardingCompleted,
       },
     });
+  }
+
+  static async verifyOTP(req: Request, res: Response) {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and OTP are required",
+      });
+    }
+
+    try {
+      await DatabaseService.connect();
+
+      const user = await User.findOne({
+        email: email.toLowerCase(),
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      if (user.emailOtp !== otp) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid OTP",
+        });
+      }
+
+      if (!user.emailOtpExpiry || user.emailOtpExpiry < new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: "OTP has expired. Please request a new one.",
+        });
+      }
+
+      user.isEmailVerified = true;
+      user.emailOtp = undefined;
+      user.emailOtpExpiry = undefined;
+      await user.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "Email verified successfully",
+      });
+    } catch (error: any) {
+      console.error("OTP verification error:", error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || "Verification failed",
+      });
+    }
+  }
+
+  static async requestOTP(req: Request, res: Response) {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    try {
+      await DatabaseService.connect();
+
+      const user = await User.findOne({ email: email.toLowerCase() });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      const otp = generateOTP();
+      user.emailOtp = otp;
+      user.emailOtpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+      await user.save();
+
+      await sendOTPEmail(user.email, otp, user.fullName || "there");
+
+      return res.status(200).json({
+        success: true,
+        message: "OTP sent successfully",
+      });
+    } catch (error: any) {
+      console.error("Request OTP error:", error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || "Failed to send OTP",
+      });
+    }
   }
 }

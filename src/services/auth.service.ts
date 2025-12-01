@@ -21,24 +21,26 @@ export class AuthService {
    * This syncs Firebase Auth users with our application database
    */
   static async createOrUpdateUser(userData: CreateUserData): Promise<IUser> {
-   try {
+    try {
       const user = await User.findOne({
         email: userData.email.toLowerCase(),
-        isActive: true
+        isActive: true,
       });
 
       if (user) {
-        console.log(`Linking ${userData.provider} to existing account: ${userData.email}`);
+        console.log(
+          `Linking ${userData.provider} to existing account: ${userData.email}`,
+        );
 
         // Remove .com/.net/etc from provider for Map key (Mongoose doesn't support dots)
-        const providerKey = userData.provider.split('.')[0]; // "google.com" → "google"
+        const providerKey = userData.provider.split(".")[0]; // "google.com" → "google"
 
         if (!user.linkedProviders) {
           user.linkedProviders = new Map();
         }
 
         user.linkedProviders.set(providerKey, userData.firebaseUid);
-        user.markModified('linkedProviders'); // ← Tell Mongoose the Map changed
+        user.markModified("linkedProviders"); // ← Tell Mongoose the Map changed
         user.lastLoginAt = new Date();
 
         if (userData.provider !== "password") {
@@ -46,11 +48,11 @@ export class AuthService {
         }
 
         if (!user.fullName && userData.fullName) {
-          user.fullName = userData.fullName
+          user.fullName = userData.fullName;
         }
 
         if (!user.displayName && userData.displayName) {
-          user.displayName = userData.displayName
+          user.displayName = userData.displayName;
         }
         if (!user.photoURL && userData.photoURL) {
           user.photoURL = userData.photoURL;
@@ -60,33 +62,31 @@ export class AuthService {
         return user;
       }
 
+      console.log(`creating new account for: ${userData.email}`);
 
-   console.log(`creating new account for: ${userData.email}`);
+      // Remove .com/.net/etc from provider for Map key (Mongoose doesn't support dots)
+      const providerKey = userData.provider.split(".")[0]; // "google.com" → "google"
 
-   // Remove .com/.net/etc from provider for Map key (Mongoose doesn't support dots)
-   const providerKey = userData.provider.split('.')[0]; // "google.com" → "google"
-
-   const newUser = await User.create({
-    firebaseUid: userData.firebaseUid,
-    email: userData.email.toLowerCase(),
-    fullName: userData.fullName,
-    displayName: userData.displayName,
-    photoURL: userData.photoURL,
-    provider: userData.provider,
-    linkedProviders: new Map([[providerKey, userData.firebaseUid]]),
-    lastLoginAt: new Date(),
-    isActive: true,
-    isEmailVerified: userData.provider !== 'password',
-    isPhoneVerified: false,
-    profileCompleted: userData.provider !== 'password'
-   });
-   return newUser;
-  } catch (error) {
-    console.log("error creating/updating user:", error);
-    throw new Error("failed to creaate or update user");
+      const newUser = await User.create({
+        firebaseUid: userData.firebaseUid,
+        email: userData.email.toLowerCase(),
+        fullName: userData.fullName,
+        displayName: userData.displayName,
+        photoURL: userData.photoURL,
+        provider: userData.provider,
+        linkedProviders: new Map([[providerKey, userData.firebaseUid]]),
+        lastLoginAt: new Date(),
+        isActive: true,
+        isEmailVerified: userData.provider !== "password",
+        isPhoneVerified: false,
+        profileCompleted: userData.provider !== "password",
+      });
+      return newUser;
+    } catch (error) {
+      console.log("error creating/updating user:", error);
+      throw new Error("failed to creaate or update user");
+    }
   }
-
-}
 
   /**
    * Get user by Firebase UID
