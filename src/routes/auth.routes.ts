@@ -187,4 +187,27 @@ router.post("/verify-otp", asyncHandler(AuthController.verifyOTP));
  */
 router.post("/request-otp", asyncHandler(AuthController.requestOTP));
 
+/**
+ * @swagger
+ * /api/auth/delete-account:
+ *   delete:
+ *     summary: Delete user account
+ *     description: Permanently delete user account and all associated data
+ *     tags: [Authentication]
+ *     security:
+ *       - FirebaseAuth: []
+ *     responses:
+ *       200:
+ *         description: Account deleted successfully
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
+ */
+router.delete(
+  "/delete-account",
+  verifyFirebaseToken,
+  asyncHandler(AuthController.deleteAccount),
+);
+
 export default router;
