@@ -101,6 +101,98 @@ router.post("/generate-plan", async (req: Request, res: Response) => {
 
 /**
  * @swagger
+ * /api/chat/create-session:
+ *   post:
+ *     summary: Create a guided wellness session
+ *     description: Creates a personalized wellness session with timed steps based on user's health data and selected products
+ *     tags: [Chat]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - tags
+ *             properties:
+ *               tags:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Product tags (e.g., ["Spa", "Hot Tub", "Sauna"])
+ *                 example: ["Spa", "Hot Tub"]
+ *               goals:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Wellness goals
+ *                 example: ["relaxation", "stress relief"]
+ *               mood:
+ *                 type: string
+ *                 description: Current mood state
+ *                 example: "stressed"
+ *               customPrompt:
+ *                 type: string
+ *                 description: Additional context or preferences
+ *     responses:
+ *       201:
+ *         description: Session created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 session:
+ *                   type: object
+ *                   properties:
+ *                     SessionId:
+ *                       type: string
+ *                     SessionName:
+ *                       type: string
+ *                     TotalDurationMinutes:
+ *                       type: number
+ *                     Steps:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           StepNumber:
+ *                             type: number
+ *                           Activity:
+ *                             type: string
+ *                           DurationMinutes:
+ *                             type: number
+ *                           Instructions:
+ *                             type: string
+ *                           Message:
+ *                             type: string
+ *                           TimerStartMessage:
+ *                             type: string
+ *                           TimerEndMessage:
+ *                             type: string
+ *                     Tips:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *       400:
+ *         description: Invalid request - missing tags
+ *       401:
+ *         description: Authentication required
+ *       500:
+ *         description: Failed to create session
+ */
+router.post("/create-session", async (req: Request, res: Response) => {
+  await chatController.createSession(req, res);
+});
+
+/**
+ * @swagger
  * /api/chat/history/{userId}:
  *   get:
  *     summary: Get chat history (Coming Soon)

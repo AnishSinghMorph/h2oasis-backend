@@ -57,6 +57,45 @@ export class ChatController {
 
       console.log("✅ AI response received");
 
+      // Try to extract JSON session from response (may be wrapped in markdown or text)
+      let parsed: any = null;
+      let jsonString = aiResponse.trim();
+      
+      // Remove markdown code blocks if present
+      if (jsonString.includes("```json")) {
+        jsonString = jsonString.replace(/```json\s*/g, "").replace(/```\s*/g, "");
+      } else if (jsonString.includes("```")) {
+        jsonString = jsonString.replace(/```\s*/g, "");
+      }
+      
+      // Try to find JSON object in the response
+      const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          parsed = JSON.parse(jsonMatch[0]);
+        } catch (e) {
+          parsed = null;
+        }
+      }
+
+      // If the parsed object looks like a Session, return structured response
+      if (
+        parsed &&
+        (parsed.SessionId || parsed.SessionName) &&
+        Array.isArray(parsed.Steps)
+      ) {
+        console.log("🛰️ Detected session JSON - returning structured session");
+        res.json({
+          success: true,
+          response: "Session created successfully. Tap 'View Session' to open it.",
+          action: "CREATE_SESSION",
+          session: parsed,
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
+
+      // Default: return raw assistant text
       res.json({
         success: true,
         response: aiResponse,
@@ -328,6 +367,62 @@ export class ChatController {
       res.status(500).json({
         error: "Failed to generate recovery plan",
         message: "Unable to create plan. Please try again.",
+      });
+    }
+  };
+
+  /**
+   * Create a guided wellness session
+   * POST /api/chat/create-session
+   */
+  createSession = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { tags, goals, mood, customPrompt } = req.body;
+      const userId = req.headers["x-firebase-uid"] as string;
+
+      if (!userId) {
+        res.status(401).json({
+          success: false,
+          error: "Authentication required",
+        });
+        return;
+      }
+
+      // Validate tags
+      if (!tags || !Array.isArray(tags) || tags.length === 0) {
+        res.status(400).json({
+          success: false,
+          error: "Tags array is required (e.g., ['Spa', 'Hot Tub'])",
+        });
+        return;
+      }
+
+      console.log("🧘 Creating session for user:", userId);
+
+      // Get user's wearables data
+      const wearablesData = await this.getWearablesDataCached(userId);
+
+      // Create session via H2Oasis AI
+      const session = await this.h2oasisAI.createSession(wearablesData, {
+        tags,
+        goals: goals || [],
+        mood: mood || "relaxed",
+        customPrompt,
+      });
+
+      console.log("✅ Session created:", session.SessionName);
+
+      res.status(201).json({
+        success: true,
+        message: "Session created successfully",
+        session,
+      });
+    } catch (error: any) {
+      console.error("❌ Session creation error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to create session",
+        message: error.message || "Unable to create session. Please try again.",
       });
     }
   };
