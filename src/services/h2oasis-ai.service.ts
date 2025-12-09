@@ -19,6 +19,30 @@ interface H2OasisChatRequest {
   user_input: string;
   wearables: any;
   session_event?: string;
+  createSession?: boolean;
+}
+
+// Session Types
+export interface SessionStep {
+  StepNumber: number;
+  Activity: string;
+  DurationMinutes: number;
+  Instructions: string;
+  Message: string;
+  TimerStartMessage: string;
+  TimerEndMessage: string;
+}
+
+export interface Session {
+  SessionId: string;
+  SessionName: string;
+  TotalDurationMinutes: number;
+  RecommendedFor: string;
+  Steps: SessionStep[];
+  StartMessage: string;
+  CompletionMessage: string;
+  Tips: string[];
+  CreatedAt: string;
 }
 
 interface H2OasisChatResponse {
@@ -117,6 +141,98 @@ export class H2OasisAIService {
       return assistantMessage;
     } catch (error) {
       console.error("❌ H2Oasis AI Service Error:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a guided wellness session
+   * Uses session_event: "create" and createSession: true
+   */
+  async createSession(
+    wearablesData: any,
+    options: {
+      tags: string[];
+      goals?: string[];
+      mood?: string;
+      customPrompt?: string;
+    },
+  ): Promise<Session> {
+    try {
+      const { tags, goals = [], mood = "relaxed", customPrompt } = options;
+
+      // Build the session creation prompt
+      const devicesList = tags.join(", ").toLowerCase() || "spa";
+      const goalsList = goals.length > 0 ? goals.join(", ") : "overall wellness";
+
+      const prompt =
+        customPrompt ||
+        `Create a guided wellness session with these specifications:
+
+• Devices to use: ${devicesList}
+• Primary goal: ${goalsList}
+• Desired mood: ${mood}
+
+OUTPUT FORMAT RULES - STRICTLY FOLLOW:
+1. Return ONLY valid JSON
+2. Include session name, duration, steps, and tips
+3. Each step should have activity, duration, instructions, and messages`;
+
+      const payload: H2OasisChatRequest = {
+        stream: false,
+        model: "gpt-4o",
+        temperature: 0,
+        session_event: "create",
+        createSession: true,
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        tags,
+        goals,
+        mood,
+        user_input: "Create a guided wellness session",
+        wearables: wearablesData,
+      };
+
+      console.log("🧘 Creating session with H2Oasis AI API...");
+
+      const response = await fetch(`${this.apiUrl}?key=${this.apiKey}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ H2Oasis AI Session Error:", errorText);
+        throw new Error(`Session creation failed: ${response.status}`);
+      }
+
+      const data: H2OasisChatResponse = await response.json();
+      const sessionContent = data.choices[0]?.message?.content;
+
+      if (!sessionContent) {
+        throw new Error("No session content in API response");
+      }
+
+      // Parse the JSON session
+      let session: Session;
+      try {
+        session = JSON.parse(sessionContent);
+      } catch (parseError) {
+        console.error("Failed to parse session JSON:", sessionContent);
+        throw new Error("Invalid session format from API");
+      }
+
+      console.log("🎉 Session created:", session.SessionName);
+      return session;
+    } catch (error) {
+      console.error("❌ Session creation error:", error);
       throw error;
     }
   }

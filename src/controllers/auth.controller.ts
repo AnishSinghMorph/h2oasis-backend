@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { z } from "zod";
 import { DatabaseService } from "../utils/database";
 import { AuthService } from "../services/auth.service";
 import { User } from "../models/User.model";
@@ -6,27 +7,53 @@ import { admin } from "../utils/firebase";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 import redis from "../utils/redis";
 import { generateOTP, sendOTPEmail } from "../services/otp.service";
+import { UserSelection } from "../models/UserSelection.model";
+
+// -----------------------------
+// ZOD SCHEMAS
+// -----------------------------
+const RegisterSchema = z.object({
+  fullName: z.string().min(1, "Full name is required"),
+  email: z.string().email("Invalid email"),
+  password: z.string().min(6, "Password must be at least 6 characters").optional(),
+  firebaseUid: z.string().optional(),
+  provider: z.string().optional(),
+});
+
+const LoginSchema = z.object({
+  email: z.string().email("Invalid email"),
+  password: z.string().min(1, "Password is required"),
+});
+
+const OTPVerifySchema = z.object({
+  email: z.string().email(),
+  otp: z.string().min(4).max(6),
+});
+
+const RequestOTPSchema = z.object({
+  email: z.string().email(),
+});
 
 export class AuthController {
+  // ----------------------------------------------------
+  // REGISTER
+  // ----------------------------------------------------
   static async register(req: Request, res: Response) {
-    const { fullName, email, password, firebaseUid, provider } = req.body;
-
     try {
+      const data = RegisterSchema.parse(req.body);
+      const { fullName, email, password, firebaseUid, provider } = data;
+
       await DatabaseService.connect();
 
-      // Handle social sign-in (Apple, Google, etc.)
+      // SOCIAL login path
       if (firebaseUid && provider && provider !== "password") {
-        // User already authenticated with Firebase via social provider
-        // Just create/update in MongoDB
-        const userData = {
+        const user = await AuthService.createOrUpdateUser({
           firebaseUid,
-          email: email || "",
-          fullName: fullName || "User",
-          displayName: fullName || "User",
+          email,
+          fullName,
+          displayName: fullName,
           provider,
-        };
-
-        const user = await AuthService.createOrUpdateUser(userData);
+        });
 
         return res.status(201).json({
           success: true,
@@ -37,38 +64,62 @@ export class AuthController {
             email: user.email,
             fullName: user.fullName,
             displayName: user.displayName,
-            provider: user.provider,
           },
-          linkedProviders: Array.from(user.linkedProviders?.keys() || [])
+          linkedProviders: Array.from(user.linkedProviders?.keys() || []),
         });
       }
 
-      // Handle password-based registration
-      if (!fullName || !email || !password) {
+      // PASSWORD signup - validate password is provided and has min length
+      if (!password || password.length < 6) {
         return res.status(400).json({
           success: false,
-          message: "Full name, email, and password are required",
+          message: "Password must be at least 6 characters",
         });
       }
 
-      if (password.length < 6) {
-        return res.status(400).json({
-          success: false,
-          message: "Password must be at least 6 characters long",
-        });
-      }
-
-      // Check if user already exists in MongoDB with verified email
       const existingUser = await User.findOne({ email: email.toLowerCase() });
-      if (existingUser && existingUser.isEmailVerified) {
+
+      // Only block if user already has PASSWORD provider (not just social login)
+      if (existingUser?.isEmailVerified && existingUser.linkedProviders?.has("password")) {
         return res.status(409).json({
           success: false,
-          message: "An account with this email already exists. Please login instead.",
+          message: "Email already registered with password. Please login.",
           code: "EMAIL_EXISTS",
         });
       }
 
-      // Create user in Firebase Auth
+      // If user exists with social login only, add password to their account
+      if (existingUser) {
+        try {
+          // Update Firebase with password
+          const existingFB = await admin.auth().getUserByEmail(email);
+          await admin.auth().updateUser(existingFB.uid, { password });
+
+          // Link password provider to existing user
+          if (!existingUser.linkedProviders) {
+            existingUser.linkedProviders = new Map();
+          }
+          existingUser.linkedProviders.set("password", existingFB.uid);
+          existingUser.markModified("linkedProviders");
+          await existingUser.save();
+
+          return res.status(200).json({
+            success: true,
+            message: "Password added to your account. You can now login with email/password.",
+            firebaseUID: existingUser.firebaseUid,
+            user: {
+              id: existingUser._id,
+              email: existingUser.email,
+              fullName: existingUser.fullName,
+            },
+            linkedProviders: Array.from(existingUser.linkedProviders.keys()),
+          });
+        } catch (error: any) {
+          console.error("Error adding password to existing account:", error);
+          throw error;
+        }
+      }
+
       let firebaseUser;
       try {
         firebaseUser = await admin.auth().createUser({
@@ -77,294 +128,243 @@ export class AuthController {
           displayName: fullName,
         });
       } catch (firebaseError: any) {
-        // If email already exists, try to get the existing user and link password
-        if (firebaseError.code === 'auth/email-already-exists') {
-          try {
-            // Get existing Firebase user by email
-            const existingUser = await admin.auth().getUserByEmail(email);
-            
-            // Update the existing user with password
-            firebaseUser = await admin.auth().updateUser(existingUser.uid, {
-              password: password,
-            });
-            
-            console.log(`✅ Added password to existing account: ${email}`);
-          } catch (updateError: any) {
-            return res.status(400).json({
-              success: false,
-              message: "This email is already registered with another provider. Please sign in with that provider first.",
-            });
-          }
+        if (firebaseError.code === "auth/email-already-exists") {
+          const existingFB = await admin.auth().getUserByEmail(email);
+          firebaseUser = await admin.auth().updateUser(existingFB.uid, { password });
         } else {
           throw firebaseError;
         }
       }
 
-      // Create user in MongoDB
-      const userData = {
+      const user = await AuthService.createOrUpdateUser({
         firebaseUid: firebaseUser.uid,
         email,
         fullName,
         displayName: fullName,
         provider: "password",
-      };
+      });
 
-      const user = await AuthService.createOrUpdateUser(userData);
-
-
-      // Generate OTP and send email for password users
+      // Generate OTP
       const otp = generateOTP();
       user.emailOtp = otp;
       user.emailOtpExpiry = new Date(Date.now() + 10 * 60 * 1000);
       await user.save();
-      await sendOTPEmail(user.email, otp, user.fullName || "there");
+
+      sendOTPEmail(user.email, otp, user.fullName || "there");
 
       return res.status(201).json({
         success: true,
         message: "User registered successfully",
         firebaseUID: user.firebaseUid,
+        requiresEmailVerification: true,
+        user: {
+          id: user._id,
+          email: user.email,
+          fullName: user.fullName,
+        },
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ success: false, message: error.errors[0].message });
+      }
+
+      console.error("Registration error:", error);
+      return res.status(500).json({ success: false, message: "Registration failed" });
+    }
+  }
+
+  // ----------------------------------------------------
+  // LOGIN
+  // ----------------------------------------------------
+  static async login(req: Request, res: Response) {
+    try {
+      const data = LoginSchema.parse(req.body);
+      const { email } = data;
+
+      await DatabaseService.connect();
+
+      const user = await User.findOne({ email: email.toLowerCase() });
+
+      if (!user)
+        return res.status(401).json({ success: false, message: "Invalid email or password" });
+
+      const customToken = await admin.auth().createCustomToken(user.firebaseUid);
+
+      user.lastLoginAt = new Date();
+      await user.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "Login successful",
+        customToken,
+        firebaseUID: user.firebaseUid,
+        user: {
+          id: user._id,
+          email: user.email,
+          fullName: user.fullName,
+        },
+        linkedProviders: Array.from(user.linkedProviders?.keys() || []),
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ success: false, message: error.errors[0].message });
+      }
+      console.error("Login error:", error);
+      return res.status(500).json({ success: false, message: "Login failed" });
+    }
+  }
+
+  // ----------------------------------------------------
+  // PROFILE
+  // ----------------------------------------------------
+  static async getProfile(req: AuthenticatedRequest, res: Response) {
+    try {
+      await DatabaseService.connect();
+
+      const user = await AuthService.getUserByFirebaseUid(req.user!.uid);
+
+      if (!user)
+        return res.status(404).json({ success: false, message: "User not found" });
+
+      return res.status(200).json({
+        success: true,
         user: {
           id: user._id,
           email: user.email,
           fullName: user.fullName,
           displayName: user.displayName,
-        },
+          isEmailVerified: user.isEmailVerified,
+          onboardingCompleted: user.onboardingCompleted,
           linkedProviders: Array.from(user.linkedProviders?.keys() || []),
-                requiresEmailVerification: true,
+        },
       });
     } catch (error: any) {
-      console.error("Registration error:", error);
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Registration failed",
-      });
+      console.error("Profile error:", error);
+      return res.status(500).json({ success: false, message: "Failed to get profile" });
     }
   }
 
-  static async login(req: Request, res: Response) {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and password are required",
-      });
-    }
-
-    // Connect to database
-    await DatabaseService.connect();
-
-    const cacheKey = `user:${email.toLowerCase()}`;
-    const cachedUser = await redis.get(cacheKey);
-    let userDoc;
-    let userForResponse;
-
-    if (cachedUser) {
-      // Use cached user for response
-      userForResponse = JSON.parse(cachedUser);
-      // Fetch Mongoose doc for updating lastLoginAt
-      userDoc = await User.findOne({ email: email.toLowerCase() });
-    } else {
-      // Fetch from DB
-      userDoc = await User.findOne({ email: email.toLowerCase() });
-      if (userDoc) {
-        userForResponse = {
-          firebaseUid: userDoc.firebaseUid,
-          email: userDoc.email,
-          fullName: userDoc.fullName,
-          displayName: userDoc.displayName,
-          lastLoginAt: userDoc.lastLoginAt,
-          _id: userDoc._id,
-        };
-        await redis.set(cacheKey, JSON.stringify(userForResponse), {
-          EX: 3600,
-        });
-      }
-    }
-
-    // If user not found in cache or DB
-    if (!userDoc) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
-    }
-
-    // Create custom token that can be exchanged for ID token on client
-    const customToken = await admin
-      .auth()
-      .createCustomToken(userDoc.firebaseUid);
-
-    // Update last login
-    userDoc.lastLoginAt = new Date();
-    await userDoc.save();
-
-    // Always use userForResponse for the response
-    return res.status(200).json({
-      success: true,
-      message: "Login successful",
-      customToken: customToken,
-      firebaseUID: userDoc.firebaseUid,
-      user: {
-        id: userDoc._id,
-        email: userDoc.email,
-        fullName: userDoc.fullName,
-        displayName: userDoc.displayName,
-      },
-       linkedProviders: Array.from(userDoc.linkedProviders?.keys() || []),
-    });
-  }
-
-  static async getProfile(req: AuthenticatedRequest, res: Response) {
-    await DatabaseService.connect();
-
-    const user = await AuthService.getUserByFirebaseUid(req.user!.uid);
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      user: {
-        id: user._id,
-        email: user.email,
-        fullName: user.fullName,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
-        isEmailVerified: user.isEmailVerified,
-        profileCompleted: user.profileCompleted,
-        onboardingCompleted: user.onboardingCompleted,
-        linkedProviders: Array.from(user.linkedProviders?.keys() || []),
-      },
-    });
-  }
-
-  static async completeOnboarding(req: AuthenticatedRequest, res: Response) {
-    const userId = req.user!.uid;
-
-    await DatabaseService.connect();
-
-    const user = await User.findOneAndUpdate(
-      { firebaseUid: userId },
-      { onboardingCompleted: true },
-      { new: true },
-    );
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Onboarding completed successfully",
-      user: {
-        id: user._id,
-        onboardingCompleted: user.onboardingCompleted,
-      },
-    });
-  }
-
+  // ----------------------------------------------------
+  // VERIFY OTP
+  // ----------------------------------------------------
   static async verifyOTP(req: Request, res: Response) {
-    const { email, otp } = req.body;
-
-    if (!email || !otp) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and OTP are required",
-      });
-    }
-
     try {
+      const data = OTPVerifySchema.parse(req.body);
+      const { email, otp } = data;
+
       await DatabaseService.connect();
 
-      const user = await User.findOne({
-        email: email.toLowerCase(),
-      });
+      const user = await User.findOne({ email: email.toLowerCase() });
 
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: "User not found",
-        });
-      }
+      if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
-      if (user.emailOtp !== otp) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid OTP",
-        });
-      }
+      if (user.emailOtp !== otp)
+        return res.status(400).json({ success: false, message: "Invalid OTP" });
 
-      if (!user.emailOtpExpiry || user.emailOtpExpiry < new Date()) {
-        return res.status(400).json({
-          success: false,
-          message: "OTP has expired. Please request a new one.",
-        });
-      }
+      if (!user.emailOtpExpiry || user.emailOtpExpiry < new Date())
+        return res.status(400).json({ success: false, message: "OTP expired" });
 
       user.isEmailVerified = true;
       user.emailOtp = undefined;
       user.emailOtpExpiry = undefined;
       await user.save();
 
-      return res.status(200).json({
-        success: true,
-        message: "Email verified successfully",
-      });
+      return res.status(200).json({ success: true, message: "Email verified" });
     } catch (error: any) {
-      console.error("OTP verification error:", error);
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Verification failed",
-      });
-   3 }
+      if (error instanceof z.ZodError)
+        return res.status(400).json({ success: false, message: error.errors[0].message });
+
+      return res.status(500).json({ success: false, message: "Verification failed" });
+    }
   }
 
+  // ----------------------------------------------------
+  // REQUEST OTP
+  // ----------------------------------------------------
   static async requestOTP(req: Request, res: Response) {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: "Email is required",
-      });
-    }
-
     try {
+      const data = RequestOTPSchema.parse(req.body);
+      const { email } = data;
+
       await DatabaseService.connect();
 
       const user = await User.findOne({ email: email.toLowerCase() });
 
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: "User not found",
-        });
-      }
+      if (!user)
+        return res.status(404).json({ success: false, message: "User not found" });
 
       const otp = generateOTP();
       user.emailOtp = otp;
       user.emailOtpExpiry = new Date(Date.now() + 10 * 60 * 1000);
       await user.save();
 
-      await sendOTPEmail(user.email, otp, user.fullName || "there");
+      sendOTPEmail(user.email, otp, user.fullName || "there");
+
+      return res.status(200).json({ success: true, message: "OTP sent" });
+    } catch (error: any) {
+      if (error instanceof z.ZodError)
+        return res.status(400).json({ success: false, message: error.errors[0].message });
+
+      return res.status(500).json({ success: false, message: "Failed to send OTP" });
+    }
+  }
+
+  // ----------------------------------------------------
+  // COMPLETE ONBOARDING
+  // ----------------------------------------------------
+  static async completeOnboarding(req: AuthenticatedRequest, res: Response) {
+    try {
+      await DatabaseService.connect();
+
+      const user = await AuthService.getUserByFirebaseUid(req.user!.uid);
+
+      if (!user)
+        return res.status(404).json({ success: false, message: "User not found" });
+
+      user.onboardingCompleted = true;
+      await user.save();
+
+      return res.status(200).json({ success: true, message: "Onboarding completed" });
+    } catch (error: any) {
+      console.error("Onboarding error:", error);
+      return res.status(500).json({ success: false, message: "Failed to complete onboarding" });
+    }
+  }
+
+  // ----------------------------------------------------
+  // DELETE ACCOUNT
+  // ----------------------------------------------------
+  static async deleteAccount(req: AuthenticatedRequest, res: Response) {
+    const firebaseUid = req.user!.uid;
+
+    try {
+      await DatabaseService.connect();
+
+      const user = await AuthService.getUserByFirebaseUid(firebaseUid);
+
+      if (!user) {
+        return res.status(404).json({ success: false, message: "User not found" });
+      }
+
+      const cacheKey = `user:${user.email.toLowerCase()}`;
+
+      // Execute all deletions *in parallel*
+      await Promise.all([
+        UserSelection.deleteMany({ userId: user._id }),
+        User.deleteOne({ firebaseUid }),
+        redis.del(cacheKey),
+        admin.auth().deleteUser(firebaseUid),
+      ]);
 
       return res.status(200).json({
         success: true,
-        message: "OTP sent successfully",
+        message: "Account deleted successfully",
       });
     } catch (error: any) {
-      console.error("Request OTP error:", error);
+      console.error("Delete account error:", error);
       return res.status(500).json({
         success: false,
-        message: error.message || "Failed to send OTP",
+        message: error.message || "Failed to delete account",
       });
     }
   }
