@@ -7,7 +7,6 @@ import { admin } from "../utils/firebase";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 import redis from "../utils/redis";
 import { generateOTP, sendOTPEmail } from "../services/otp.service";
-import { UserSelection } from "../models/UserSelection.model";
 
 // -----------------------------
 // ZOD SCHEMAS
@@ -233,6 +232,7 @@ export class AuthController {
           email: user.email,
           fullName: user.fullName,
           displayName: user.displayName,
+          photoURL: user.photoURL,
           isEmailVerified: user.isEmailVerified,
           onboardingCompleted: user.onboardingCompleted,
           linkedProviders: Array.from(user.linkedProviders?.keys() || []),
@@ -350,7 +350,6 @@ export class AuthController {
 
       // Execute all deletions *in parallel*
       await Promise.all([
-        UserSelection.deleteMany({ userId: user._id }),
         User.deleteOne({ firebaseUid }),
         redis.del(cacheKey),
         admin.auth().deleteUser(firebaseUid),

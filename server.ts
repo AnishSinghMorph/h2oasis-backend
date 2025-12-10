@@ -10,10 +10,8 @@ import {
 } from "./src/middleware/essential.middleware";
 import { ensureDbConnection } from "./src/middleware/database.middleware";
 import { DatabaseService } from "./src/utils/database";
-import { Product } from "./src/models/Product.model";
 import authRoutes from "./src/routes/auth.routes";
 import healthRoutes from "./src/routes/health.routes";
-import productRoutes from "./src/routes/product.routes";
 import chatRoutes from "./src/routes/chat.routes";
 import ttsRoutes from "./src/routes/tts.routes";
 import sttRoutes from "./src/routes/stt.routes";
@@ -22,6 +20,7 @@ import elevenlabsRoutes from "./src/routes/elevenLabs.routes";
 import webhookRoutes from "./src/routes/webhook.routes";
 import { rookWebhookService } from "./src/services/webhooks.service";
 import profileRoutes from './src/routes/profile.routes';
+import onboardingRoutes from './src/routes/onboarding.routes';
 
 // Initialize Firebase Admin
 initializeFirebaseAdmin();
@@ -75,13 +74,13 @@ app.get("/api-docs.json", (req, res) => {
 // ============================================
 app.use("/health", healthRoutes);
 app.use("/api/auth", authRoutes);
-app.use("/api/products", productRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/tts", ttsRoutes);
 app.use("/api/stt", sttRoutes);
 app.use("/api/health-data", healthDataRoutes);
 app.use("/api/elevenlabs", elevenlabsRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/onboarding', onboardingRoutes);
 // WEBHOOK ROUTES (No authentication required - validated via HMAC)
 app.use("/api/webhooks/rook", webhookRoutes);
 
@@ -154,26 +153,11 @@ app.listen(port, "0.0.0.0", async () => {
   // Log webhook configuration
   rookWebhookService.logConfigurationStatus();
 
-  // Auto-seed products on server start (like Django fixtures)
+  // Connect to database on startup
   try {
     await DatabaseService.connect();
-    const existingProducts = await Product.countDocuments();
-
-    if (existingProducts === 0) {
-      console.log("🌱 No products found, seeding default products...");
-      await Product.insertMany([
-        { name: "Cold Plunge", type: "cold-plunge" },
-        { name: "Hot Tub", type: "hot-tub" },
-        { name: "Sauna", type: "sauna" },
-      ]);
-      console.log("✅ Products seeded successfully! (3 products created)");
-    } else {
-      console.log(
-        `📦 Products already exist (${existingProducts} products found)`,
-      );
-    }
+    console.log("✅ Database connected successfully");
   } catch (error) {
-    console.error("❌ Error seeding products:", error);
-    // Don't exit - server can still handle other requests
+    console.error("❌ Error connecting to database:", error);
   }
 });

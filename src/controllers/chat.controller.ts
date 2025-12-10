@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { H2OasisAIService } from "../services/h2oasis-ai.service";
 import { User } from "../models/User.model";
-import { UserSelection } from "../models/UserSelection.model";
 import redisClient from "../utils/redis";
 
 export class ChatController {
@@ -154,11 +153,6 @@ export class ChatController {
       // Get user profile
       const user = await User.findOne({ firebaseUid: userId });
 
-      // Get user's product selection
-      const userSelection = (await UserSelection.findOne({ userId }).populate(
-        "productId",
-      )) as any;
-
       // Get user's wearable connection statuses from database
       const wearables = user?.wearables || {};
 
@@ -177,12 +171,12 @@ export class ChatController {
             email: user?.email,
             uid: userId,
           },
-          selectedProduct: userSelection
+          selectedProduct: user?.selectedProduct
             ? {
-                id: userSelection.productId._id.toString(),
-                name: userSelection.productId.name,
-                type: userSelection.productId.type,
-                selectedAt: userSelection.selectedAt.toISOString(),
+                id: user.selectedProduct.type,
+                name: user.selectedProduct.name,
+                type: user.selectedProduct.type,
+                selectedAt: user.selectedProduct.selectedAt.toISOString(),
               }
             : {
                 id: "unspecified",
@@ -190,6 +184,14 @@ export class ChatController {
                 type: "unspecified",
                 selectedAt: new Date().toISOString(),
               },
+          focusGoal: user?.focusGoal
+            ? {
+                key: user.focusGoal.key,
+                label: user.focusGoal.label,
+                customText: user.focusGoal.customText || null,
+                selectedAt: user.focusGoal.selectedAt.toISOString(),
+              }
+            : null,
           wearables: {
             apple: {
               id: "apple",

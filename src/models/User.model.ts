@@ -31,6 +31,17 @@ export interface IUser extends Document {
   photoURL?: string;
   emailOtp?: string;
   emailOtpExpiry?: Date;
+  selectedProduct?: {
+    type: string;
+    name: string;
+    selectedAt: Date;
+  };
+  focusGoal?: {
+    key: string;
+    label: string;
+    customText?: string;
+    selectedAt: Date;
+  };
 }
 
 const UserSchema = new Schema<IUser>(
@@ -117,6 +128,23 @@ const UserSchema = new Schema<IUser>(
     },
     emailOtp: { type: String },
     emailOtpExpiry: { type: Date },
+    selectedProduct: {
+      type: {
+        type: String,
+        enum: ["cold-plunge", "hot-tub", "sauna"],
+      },
+      name: String,
+      selectedAt: { type: Date, default: Date.now },
+    },
+    focusGoal: {
+      key: {
+        type: String,
+        enum: ["stress-relief", "training-recovery", "traveler-balance", "muscle-recovery", "relax-rebalance", "other"],
+      },
+      label: String,
+      customText: String,
+      selectedAt: { type: Date, default: Date.now },
+    },
   },
   {
     timestamps: true,

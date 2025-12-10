@@ -31,29 +31,23 @@ const ELEVENLABS_CONFIG = {
 
 // Available persona voices
 export const PERSONA_VOICES = {
-  alice: {
+  emily: {
+    key: "emily",
     id: process.env.ELEVENLABS_VOICE_LENA || "Xb7hH8MSUJpSbSDYk0k2",
-    name: "Alice",
-    subtitle: "The Mindful Explorer",
-    description: "Calm, soothing voice perfect for wellness guidance",
+    name: "Emily",
+    subtitle: "Calm, Soothing",
+    description: "Soothing, intelligent guidance to relax your mind and ease your day.",
     gender: "female",
     accent: "american",
   },
-  bill: {
+  kai: {
+    key: "kai",
     id: process.env.ELEVENLABS_VOICE_ARJUN || "pqHfZKP75CvOlQylNhV4",
-    name: "Bill",
-    subtitle: "The Tech Visionary",
-    description: "Clear, confident voice for technical discussions",
+    name: "Kai",
+    subtitle: "Motivational",
+    description: "High-energy, results-focused coaching to push your limits and maximize every session.",
     gender: "male",
-    accent: "british",
-  },
-  elli: {
-    id: process.env.ELEVENLABS_VOICE_SOPHIA || "MF3mGyEYCl7XYWbV9V6O",
-    name: "Elli",
-    subtitle: "The Creative Dreamer",
-    description: "Warm, inspiring voice for creative motivation",
-    gender: "female",
-    accent: "australian",
+    accent: "american",
   },
 };
 
