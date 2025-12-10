@@ -1,7 +1,5 @@
 import { Request, Response } from "express";
 import { User } from "../models/User.model";
-import { UserSelection } from "../models/UserSelection.model";
-import { Product } from "../models/Product.model";
 import {
   getUserConnections,
   getAllHealthDataForSource,
@@ -31,6 +29,12 @@ interface UnifiedHealthData {
     id: string;
     name: string;
     type: string;
+    selectedAt: string;
+  } | null;
+  focusGoal: {
+    key: string;
+    label: string;
+    customText: string | null;
     selectedAt: string;
   } | null;
   wearables: {
@@ -64,11 +68,6 @@ export const getUnifiedHealthData = async (
     // Get user profile
     const user = await User.findOne({ firebaseUid: userId });
 
-    // Get user's product selection
-    const userSelection = (await UserSelection.findOne({ userId }).populate(
-      "productId",
-    )) as any;
-
     // Get user's wearable connection statuses from database
     const wearables = user?.wearables || {};
 
@@ -82,12 +81,20 @@ export const getUnifiedHealthData = async (
         email: user?.email,
         uid: userId,
       },
-      selectedProduct: userSelection
+      selectedProduct: user?.selectedProduct
         ? {
-            id: userSelection.productId._id.toString(),
-            name: userSelection.productId.name,
-            type: userSelection.productId.type,
-            selectedAt: userSelection.selectedAt.toISOString(),
+            id: user.selectedProduct.type,
+            name: user.selectedProduct.name,
+            type: user.selectedProduct.type,
+            selectedAt: user.selectedProduct.selectedAt.toISOString(),
+          }
+        : null,
+      focusGoal: user?.focusGoal
+        ? {
+            key: user.focusGoal.key,
+            label: user.focusGoal.label,
+            customText: user.focusGoal.customText || null,
+            selectedAt: user.focusGoal.selectedAt.toISOString(),
           }
         : null,
       wearables: {
