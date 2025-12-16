@@ -25,7 +25,7 @@ const deleteFromS3 = async (photoURL: string): Promise<void> => {
       new DeleteObjectCommand({
         Bucket: process.env.AWS_S3_BUCKET_NAME!,
         Key: urlParts[1],
-      })
+      }),
     );
     console.log("✅ Deleted old file from S3:", urlParts[1]);
   } catch (error) {
@@ -48,7 +48,11 @@ const sendError = (res: Response, status: number, message: string) => {
   res.status(status).json({ success: false, message });
 };
 
-const sendSuccess = (res: Response, message: string, data?: Record<string, any>) => {
+const sendSuccess = (
+  res: Response,
+  message: string,
+  data?: Record<string, any>,
+) => {
   res.status(200).json({ success: true, message, ...data });
 };
 
@@ -61,7 +65,7 @@ export class ProfileController {
    */
   static uploadProfilePicture = async (
     req: AuthenticatedRequest,
-    res: Response
+    res: Response,
   ): Promise<void> => {
     try {
       const file = req.file as Express.MulterS3.File;
@@ -82,7 +86,7 @@ export class ProfileController {
       const user = await User.findOneAndUpdate(
         { firebaseUid: userId },
         { photoURL },
-        { new: true }
+        { new: true },
       );
 
       if (!user) {
@@ -102,7 +106,7 @@ export class ProfileController {
    */
   static deleteProfilePicture = async (
     req: AuthenticatedRequest,
-    res: Response
+    res: Response,
   ): Promise<void> => {
     try {
       const userId = req.user!.uid;
@@ -119,7 +123,7 @@ export class ProfileController {
 
       await User.findOneAndUpdate(
         { firebaseUid: userId },
-        { $unset: { photoURL: "" } }
+        { $unset: { photoURL: "" } },
       );
 
       sendSuccess(res, "Profile picture deleted successfully");

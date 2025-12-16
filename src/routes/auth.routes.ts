@@ -2,6 +2,10 @@ import { Router } from "express";
 import { AuthController } from "../controllers/auth.controller";
 import { verifyFirebaseToken } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/essential.middleware";
+import {
+  forgotPassword,
+  resetPasswordWithCode,
+} from "../controllers/passwordReset.controller";
 
 const router = Router();
 
@@ -209,5 +213,79 @@ router.delete(
   verifyFirebaseToken,
   asyncHandler(AuthController.deleteAccount),
 );
+
+/**
+ * @swagger
+ * /api/auth/forgot-password:
+ *   post:
+ *     summary: Request password reset code
+ *     description: Send a 6-digit reset code to user's email
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: user@example.com
+ *     responses:
+ *       200:
+ *         description: Reset code sent successfully (or email doesn't exist - for security)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Invalid email format
+ */
+router.post("/forgot-password", asyncHandler(forgotPassword));
+
+/**
+ * @swagger
+ * /api/auth/reset-password:
+ *   post:
+ *     summary: Reset password with code
+ *     description: Verify reset code and update password
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - code
+ *               - newPassword
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: user@example.com
+ *               code:
+ *                 type: string
+ *                 example: "123456"
+ *               newPassword:
+ *                 type: string
+ *                 format: password
+ *                 example: "NewSecure123!"
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *       400:
+ *         description: Invalid code or expired
+ */
+router.post("/reset-password", asyncHandler(resetPasswordWithCode));
 
 export default router;

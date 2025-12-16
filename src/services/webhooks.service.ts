@@ -46,11 +46,6 @@ export class RookWebhookService {
     const missing: string[] = [];
     const warnings: string[] = [];
 
-    // Check required environment variables
-    if (!process.env.ROOK_WEBHOOK_SECRET_KEY) {
-      missing.push("ROOK_WEBHOOK_SECRET_KEY");
-    }
-
     if (!process.env.WEBHOOK_BASE_URL && !process.env.BASE_URL) {
       missing.push("WEBHOOK_BASE_URL or BASE_URL");
     }

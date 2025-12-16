@@ -163,7 +163,8 @@ export class H2OasisAIService {
 
       // Build the session creation prompt
       const devicesList = tags.join(", ").toLowerCase() || "spa";
-      const goalsList = goals.length > 0 ? goals.join(", ") : "overall wellness";
+      const goalsList =
+        goals.length > 0 ? goals.join(", ") : "overall wellness";
 
       const prompt =
         customPrompt ||

@@ -38,27 +38,44 @@ interface NotificationPayload {
 
 /**
  * Verify HMAC signature from ROOK webhook
+ * ROOK generates HMAC from: client_uuid + user_id + datetime (concatenated without separators)
+ * Uses HMAC-SHA256 with secret hash key
  */
-const verifyRookSignature = (payload: string, signature: string): boolean => {
+const verifyRookSignature = (
+  client_uuid: string,
+  user_id: string,
+  datetime: string,
+  signature: string,
+): boolean => {
   try {
-    const secretKey = process.env.ROOK_WEBHOOK_SECRET_KEY;
+    const secretHashKey = process.env.ROOK_SECRET_HASH_KEY;
 
-    if (!secretKey) {
-      console.error("❌ ROOK webhook secret key not configured");
+    if (!secretHashKey) {
+      console.error("❌ ROOK secret hash key not configured");
+      console.warn(
+        "⚠️  Set ROOK_SECRET_HASH_KEY in .env (contact ROOK support to obtain)",
+      );
       return false;
     }
 
-    // ROOK sends HMAC-SHA256 signature in X-ROOK-HASH header
+    // ROOK concatenates: client_uuid + user_id + datetime (no separators)
+    const message = `${client_uuid}${user_id}${datetime}`;
+
+    // Generate HMAC-SHA256 signature
     const expectedSignature = crypto
-      .createHmac("sha256", secretKey)
-      .update(payload)
+      .createHmac("sha256", secretHashKey)
+      .update(message)
       .digest("hex");
 
-    const providedSignature = signature.replace("sha256=", "");
+    console.log("🔐 HMAC Verification:");
+    console.log(`   Message: ${message}`);
+    console.log(`   Expected: ${expectedSignature}`);
+    console.log(`   Received: ${signature}`);
 
+    // Timing-safe comparison to prevent timing attacks
     return crypto.timingSafeEqual(
       Buffer.from(expectedSignature, "hex"),
-      Buffer.from(providedSignature, "hex"),
+      Buffer.from(signature, "hex"),
     );
   } catch (error) {
     console.error("❌ Error verifying ROOK signature:", error);
@@ -80,29 +97,64 @@ export const handleRookHealthDataWebhook = async (
   try {
     console.log("🔔 Received ROOK health data webhook");
 
-    // Get raw body and signature
-    const rawBody = JSON.stringify(req.body);
+    const webhookData: any = req.body;
     const signature = req.headers["x-rook-hash"] as string;
 
-    // TEMPORARILY DISABLED HMAC VERIFICATION FOR DEVELOPMENT
-    if (process.env.NODE_ENV === "production") {
-      if (!verifyRookSignature(rawBody, signature)) {
-        console.error("❌ Invalid ROOK webhook signature");
-        res.status(401).json({ error: "Invalid signature" });
-        return;
-      }
-    } else {
-      console.log("⚠️ HMAC signature verification DISABLED for development");
-    }
-
-    const webhookData: any = req.body;
     console.log(
       "🔍 Full health webhook payload:",
       JSON.stringify(req.body, null, 2),
     );
 
-    // ROOK uses consistent field names from API - user_id, data_structure, etc.
+    // Extract required fields for HMAC verification
+    const client_uuid = webhookData.client_uuid;
     const user_id = webhookData.user_id;
+    // Extract datetime from metadata or root level
+    const datetime =
+      webhookData.datetime ||
+      webhookData.health_score_data?.metadata?.datetime_string ||
+      webhookData.body_health?.summary?.body_summary?.metadata?.datetime ||
+      webhookData.physical_health?.summary?.physical_summary?.metadata
+        ?.datetime ||
+      webhookData.sleep_health?.summary?.sleep_summary?.metadata?.datetime ||
+      webhookData.action_datetime;
+
+    // Only verify HMAC if signature header is present
+    if (!client_uuid || !user_id) {
+      console.error("❌ Missing required fields:", { client_uuid, user_id });
+      res.status(400).json({
+        error: "Missing required fields: client_uuid or user_id",
+      });
+      return;
+    }
+
+    // Verify HMAC signature (only if both signature and datetime are present)
+    if (signature && datetime) {
+      const isValid = verifyRookSignature(
+        client_uuid,
+        user_id,
+        datetime,
+        signature,
+      );
+
+      if (!isValid) {
+        console.error("❌ Invalid ROOK webhook signature");
+        res.status(401).json({ error: "Invalid signature" });
+        return;
+      }
+
+      console.log("✅ ROOK webhook signature verified");
+    } else {
+      if (!signature) {
+        console.warn(
+          "⚠️  No x-rook-hash header provided - webhook not verified",
+        );
+      }
+      if (!datetime) {
+        console.warn("⚠️  No datetime field found - HMAC verification skipped");
+      }
+    }
+
+    // ROOK uses consistent field names from API - user_id, data_structure, etc.
     const data_structure = webhookData.data_structure;
 
     // Extract data source from metadata or root level
@@ -222,28 +274,59 @@ export const handleRookNotificationWebhook = async (
       JSON.stringify(req.body, null, 2),
     );
 
-    // Get raw body and signature
-    const rawBody = JSON.stringify(req.body);
+    const notificationData: any = req.body;
     const signature = req.headers["x-rook-hash"] as string;
 
-    // TEMPORARILY DISABLED HMAC VERIFICATION FOR DEVELOPMENT
-    if (process.env.NODE_ENV === "production") {
-      if (!verifyRookSignature(rawBody, signature)) {
+    // Extract required fields for HMAC verification
+    const client_uuid = notificationData.client_uuid;
+    const user_id = notificationData.user_id;
+    const datetime =
+      notificationData.action_datetime || notificationData.datetime;
+
+    // Notifications may not have user_id (e.g., error notifications)
+    if (!client_uuid) {
+      console.error("❌ Missing required field: client_uuid");
+      res.status(400).json({
+        error: "Missing required field: client_uuid",
+      });
+      return;
+    }
+
+    // Verify HMAC signature (only if all required fields are present)
+    if (signature && user_id && datetime) {
+      const isValid = verifyRookSignature(
+        client_uuid,
+        user_id,
+        datetime,
+        signature,
+      );
+
+      if (!isValid) {
         console.error("❌ Invalid ROOK webhook signature");
         res.status(401).json({ error: "Invalid signature" });
         return;
       }
-    } else {
-      console.log("⚠️ HMAC signature verification DISABLED for development");
-    }
 
-    const notificationData: any = req.body;
+      console.log("✅ ROOK webhook signature verified");
+    } else {
+      if (!signature) {
+        console.warn(
+          "⚠️  No x-rook-hash header provided - webhook not verified",
+        );
+      }
+      if (!user_id) {
+        console.warn(
+          "⚠️  No user_id in notification - HMAC verification skipped",
+        );
+      }
+      if (!datetime) {
+        console.warn("⚠️  No datetime found - HMAC verification skipped");
+      }
+    }
 
     // ROOK notification format: action, client_uuid, user_id, data_source, level, message, action_datetime, environment
     const action = notificationData.action; // e.g., "user_connected", "user_disconnected"
-    const user_id = notificationData.user_id;
     const data_source = notificationData.data_source;
-    const client_uuid = notificationData.client_uuid;
     const level = notificationData.level; // e.g., "info", "warning", "error"
     const message = notificationData.message;
     const action_datetime = notificationData.action_datetime;

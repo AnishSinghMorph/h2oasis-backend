@@ -14,6 +14,7 @@ export interface IWearableConnection {
 export interface IUser extends Document {
   firebaseUid: string;
   email: string;
+  password?: string;
   fullName?: string;
   phone?: string;
   displayName?: string;
@@ -62,6 +63,10 @@ const UserSchema = new Schema<IUser>(
         /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
         "Please enter a valid email",
       ],
+    },
+    password: {
+      type: String,
+      select: false,
     },
     fullName: {
       type: String,
@@ -139,7 +144,14 @@ const UserSchema = new Schema<IUser>(
     focusGoal: {
       key: {
         type: String,
-        enum: ["stress-relief", "training-recovery", "traveler-balance", "muscle-recovery", "relax-rebalance", "other"],
+        enum: [
+          "stress-relief",
+          "training-recovery",
+          "traveler-balance",
+          "muscle-recovery",
+          "relax-rebalance",
+          "other",
+        ],
       },
       label: String,
       customText: String,
