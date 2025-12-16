@@ -64,9 +64,9 @@ export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number];
 // CACHE TTL CONSTANTS (in seconds)
 // ============================================
 export const CACHE_TTL = {
-  USER: 300,           // 5 minutes
-  HEALTH_DATA: 60,     // 1 minute
-  WEARABLES: 300,      // 5 minutes
+  USER: 300, // 5 minutes
+  HEALTH_DATA: 60, // 1 minute
+  WEARABLES: 300, // 5 minutes
 } as const;
 
 // ============================================

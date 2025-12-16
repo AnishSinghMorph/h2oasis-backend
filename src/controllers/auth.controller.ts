@@ -14,7 +14,10 @@ import { generateOTP, sendOTPEmail } from "../services/otp.service";
 const RegisterSchema = z.object({
   fullName: z.string().min(1, "Full name is required"),
   email: z.string().email("Invalid email"),
-  password: z.string().min(6, "Password must be at least 6 characters").optional(),
+  password: z
+    .string()
+    .min(6, "Password must be at least 6 characters")
+    .optional(),
   firebaseUid: z.string().optional(),
   provider: z.string().optional(),
 });
@@ -79,7 +82,10 @@ export class AuthController {
       const existingUser = await User.findOne({ email: email.toLowerCase() });
 
       // Only block if user already has PASSWORD provider (not just social login)
-      if (existingUser?.isEmailVerified && existingUser.linkedProviders?.has("password")) {
+      if (
+        existingUser?.isEmailVerified &&
+        existingUser.linkedProviders?.has("password")
+      ) {
         return res.status(409).json({
           success: false,
           message: "Email already registered with password. Please login.",
@@ -104,7 +110,8 @@ export class AuthController {
 
           return res.status(200).json({
             success: true,
-            message: "Password added to your account. You can now login with email/password.",
+            message:
+              "Password added to your account. You can now login with email/password.",
             firebaseUID: existingUser.firebaseUid,
             user: {
               id: existingUser._id,
@@ -129,7 +136,9 @@ export class AuthController {
       } catch (firebaseError: any) {
         if (firebaseError.code === "auth/email-already-exists") {
           const existingFB = await admin.auth().getUserByEmail(email);
-          firebaseUser = await admin.auth().updateUser(existingFB.uid, { password });
+          firebaseUser = await admin
+            .auth()
+            .updateUser(existingFB.uid, { password });
         } else {
           throw firebaseError;
         }
@@ -164,11 +173,15 @@ export class AuthController {
       });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ success: false, message: error.errors[0].message });
+        return res
+          .status(400)
+          .json({ success: false, message: error.errors[0].message });
       }
 
       console.error("Registration error:", error);
-      return res.status(500).json({ success: false, message: "Registration failed" });
+      return res
+        .status(500)
+        .json({ success: false, message: "Registration failed" });
     }
   }
 
@@ -185,9 +198,13 @@ export class AuthController {
       const user = await User.findOne({ email: email.toLowerCase() });
 
       if (!user)
-        return res.status(401).json({ success: false, message: "Invalid email or password" });
+        return res
+          .status(401)
+          .json({ success: false, message: "Invalid email or password" });
 
-      const customToken = await admin.auth().createCustomToken(user.firebaseUid);
+      const customToken = await admin
+        .auth()
+        .createCustomToken(user.firebaseUid);
 
       user.lastLoginAt = new Date();
       await user.save();
@@ -206,7 +223,9 @@ export class AuthController {
       });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ success: false, message: error.errors[0].message });
+        return res
+          .status(400)
+          .json({ success: false, message: error.errors[0].message });
       }
       console.error("Login error:", error);
       return res.status(500).json({ success: false, message: "Login failed" });
@@ -223,7 +242,9 @@ export class AuthController {
       const user = await AuthService.getUserByFirebaseUid(req.user!.uid);
 
       if (!user)
-        return res.status(404).json({ success: false, message: "User not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
 
       return res.status(200).json({
         success: true,
@@ -240,7 +261,9 @@ export class AuthController {
       });
     } catch (error: any) {
       console.error("Profile error:", error);
-      return res.status(500).json({ success: false, message: "Failed to get profile" });
+      return res
+        .status(500)
+        .json({ success: false, message: "Failed to get profile" });
     }
   }
 
@@ -256,7 +279,10 @@ export class AuthController {
 
       const user = await User.findOne({ email: email.toLowerCase() });
 
-      if (!user) return res.status(404).json({ success: false, message: "User not found" });
+      if (!user)
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
 
       if (user.emailOtp !== otp)
         return res.status(400).json({ success: false, message: "Invalid OTP" });
@@ -272,9 +298,13 @@ export class AuthController {
       return res.status(200).json({ success: true, message: "Email verified" });
     } catch (error: any) {
       if (error instanceof z.ZodError)
-        return res.status(400).json({ success: false, message: error.errors[0].message });
+        return res
+          .status(400)
+          .json({ success: false, message: error.errors[0].message });
 
-      return res.status(500).json({ success: false, message: "Verification failed" });
+      return res
+        .status(500)
+        .json({ success: false, message: "Verification failed" });
     }
   }
 
@@ -291,7 +321,9 @@ export class AuthController {
       const user = await User.findOne({ email: email.toLowerCase() });
 
       if (!user)
-        return res.status(404).json({ success: false, message: "User not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
 
       const otp = generateOTP();
       user.emailOtp = otp;
@@ -303,9 +335,13 @@ export class AuthController {
       return res.status(200).json({ success: true, message: "OTP sent" });
     } catch (error: any) {
       if (error instanceof z.ZodError)
-        return res.status(400).json({ success: false, message: error.errors[0].message });
+        return res
+          .status(400)
+          .json({ success: false, message: error.errors[0].message });
 
-      return res.status(500).json({ success: false, message: "Failed to send OTP" });
+      return res
+        .status(500)
+        .json({ success: false, message: "Failed to send OTP" });
     }
   }
 
@@ -319,15 +355,21 @@ export class AuthController {
       const user = await AuthService.getUserByFirebaseUid(req.user!.uid);
 
       if (!user)
-        return res.status(404).json({ success: false, message: "User not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
 
       user.onboardingCompleted = true;
       await user.save();
 
-      return res.status(200).json({ success: true, message: "Onboarding completed" });
+      return res
+        .status(200)
+        .json({ success: true, message: "Onboarding completed" });
     } catch (error: any) {
       console.error("Onboarding error:", error);
-      return res.status(500).json({ success: false, message: "Failed to complete onboarding" });
+      return res
+        .status(500)
+        .json({ success: false, message: "Failed to complete onboarding" });
     }
   }
 
@@ -343,7 +385,9 @@ export class AuthController {
       const user = await AuthService.getUserByFirebaseUid(firebaseUid);
 
       if (!user) {
-        return res.status(404).json({ success: false, message: "User not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
       }
 
       const cacheKey = `user:${user.email.toLowerCase()}`;

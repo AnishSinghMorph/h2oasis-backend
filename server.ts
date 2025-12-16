@@ -19,8 +19,8 @@ import healthDataRoutes from "./src/routes/healthData.routes";
 import elevenlabsRoutes from "./src/routes/elevenLabs.routes";
 import webhookRoutes from "./src/routes/webhook.routes";
 import { rookWebhookService } from "./src/services/webhooks.service";
-import profileRoutes from './src/routes/profile.routes';
-import onboardingRoutes from './src/routes/onboarding.routes';
+import profileRoutes from "./src/routes/profile.routes";
+import onboardingRoutes from "./src/routes/onboarding.routes";
 
 // Initialize Firebase Admin
 initializeFirebaseAdmin();
@@ -79,8 +79,8 @@ app.use("/api/tts", ttsRoutes);
 app.use("/api/stt", sttRoutes);
 app.use("/api/health-data", healthDataRoutes);
 app.use("/api/elevenlabs", elevenlabsRoutes);
-app.use('/api/profile', profileRoutes);
-app.use('/api/onboarding', onboardingRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/onboarding", onboardingRoutes);
 // WEBHOOK ROUTES (No authentication required - validated via HMAC)
 app.use("/api/webhooks/rook", webhookRoutes);
 
@@ -126,7 +126,7 @@ app.use(errorHandler);
 // ============================================
 const gracefulShutdown = async (signal: string) => {
   console.log(`\n${signal} received. Starting graceful shutdown...`);
-  
+
   try {
     await DatabaseService.disconnect();
     console.log("✅ Database disconnected successfully");

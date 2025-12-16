@@ -36,7 +36,8 @@ export const PERSONA_VOICES = {
     id: process.env.ELEVENLABS_VOICE_LENA || "Xb7hH8MSUJpSbSDYk0k2",
     name: "Emily",
     subtitle: "Calm, Soothing",
-    description: "Soothing, intelligent guidance to relax your mind and ease your day.",
+    description:
+      "Soothing, intelligent guidance to relax your mind and ease your day.",
     gender: "female",
     accent: "american",
   },
@@ -45,7 +46,8 @@ export const PERSONA_VOICES = {
     id: process.env.ELEVENLABS_VOICE_ARJUN || "pqHfZKP75CvOlQylNhV4",
     name: "Kai",
     subtitle: "Motivational",
-    description: "High-energy, results-focused coaching to push your limits and maximize every session.",
+    description:
+      "High-energy, results-focused coaching to push your limits and maximize every session.",
     gender: "male",
     accent: "american",
   },

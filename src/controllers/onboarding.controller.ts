@@ -10,7 +10,11 @@ const sendError = (res: Response, status: number, message: string) => {
   res.status(status).json({ success: false, message });
 };
 
-const sendSuccess = (res: Response, message: string, data?: Record<string, any>) => {
+const sendSuccess = (
+  res: Response,
+  message: string,
+  data?: Record<string, any>,
+) => {
   res.status(200).json({ success: true, message, ...data });
 };
 
@@ -23,13 +27,17 @@ export class OnboardingController {
    */
   static selectProduct = async (
     req: AuthenticatedRequest,
-    res: Response
+    res: Response,
   ): Promise<void> => {
     try {
       const { type, name } = req.body;
 
       if (!type || !PRODUCT_TYPES.includes(type)) {
-        sendError(res, 400, `Invalid product type. Must be: ${PRODUCT_TYPES.join(", ")}`);
+        sendError(
+          res,
+          400,
+          `Invalid product type. Must be: ${PRODUCT_TYPES.join(", ")}`,
+        );
         return;
       }
 
@@ -42,7 +50,7 @@ export class OnboardingController {
             selectedAt: new Date(),
           },
         },
-        { new: true }
+        { new: true },
       );
 
       if (!user) {
@@ -64,13 +72,17 @@ export class OnboardingController {
    */
   static selectFocusGoal = async (
     req: AuthenticatedRequest,
-    res: Response
+    res: Response,
   ): Promise<void> => {
     try {
       const { key, label, customText } = req.body;
 
       if (!key || !FOCUS_GOAL_KEYS.includes(key)) {
-        sendError(res, 400, `Invalid focus goal. Must be: ${FOCUS_GOAL_KEYS.join(", ")}`);
+        sendError(
+          res,
+          400,
+          `Invalid focus goal. Must be: ${FOCUS_GOAL_KEYS.join(", ")}`,
+        );
         return;
       }
 
@@ -84,7 +96,7 @@ export class OnboardingController {
             selectedAt: new Date(),
           },
         },
-        { new: true }
+        { new: true },
       );
 
       if (!user) {

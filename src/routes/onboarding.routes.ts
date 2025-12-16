@@ -9,14 +9,14 @@ const router = Router();
 router.post(
   "/select-product",
   verifyFirebaseToken,
-  asyncHandler(OnboardingController.selectProduct)
+  asyncHandler(OnboardingController.selectProduct),
 );
 
 // Select focus goal
 router.post(
   "/select-focus-goal",
   verifyFirebaseToken,
-  asyncHandler(OnboardingController.selectFocusGoal)
+  asyncHandler(OnboardingController.selectFocusGoal),
 );
 
 export default router;

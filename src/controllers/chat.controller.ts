@@ -32,6 +32,16 @@ export class ChatController {
       // Fetch user's wearables data (with caching)
       const wearablesData = await this.getWearablesDataCached(userId);
 
+      // Get user to retrieve focusGoal
+      const user = await User.findOne({ firebaseUid: userId });
+
+      // Build goals array: prioritize passed goals, fallback to user's focusGoal
+      let goalsArray = goals || [];
+      if (goalsArray.length === 0 && user?.focusGoal?.label) {
+        goalsArray = [user.focusGoal.label];
+        console.log("📌 Using user's focus goal:", user.focusGoal.label);
+      }
+
       // Build messages array for H2Oasis AI
       const messages = [
         ...(chatHistory || []),
@@ -48,7 +58,7 @@ export class ChatController {
         wearablesData,
         {
           tags,
-          goals,
+          goals: goalsArray,
           mood,
           isNewSession,
         },
@@ -59,14 +69,16 @@ export class ChatController {
       // Try to extract JSON session from response (may be wrapped in markdown or text)
       let parsed: any = null;
       let jsonString = aiResponse.trim();
-      
+
       // Remove markdown code blocks if present
       if (jsonString.includes("```json")) {
-        jsonString = jsonString.replace(/```json\s*/g, "").replace(/```\s*/g, "");
+        jsonString = jsonString
+          .replace(/```json\s*/g, "")
+          .replace(/```\s*/g, "");
       } else if (jsonString.includes("```")) {
         jsonString = jsonString.replace(/```\s*/g, "");
       }
-      
+
       // Try to find JSON object in the response
       const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -86,7 +98,8 @@ export class ChatController {
         console.log("🛰️ Detected session JSON - returning structured session");
         res.json({
           success: true,
-          response: "Session created successfully. Tap 'View Session' to open it.",
+          response:
+            "Session created successfully. Tap 'View Session' to open it.",
           action: "CREATE_SESSION",
           session: parsed,
           timestamp: new Date().toISOString(),
@@ -404,11 +417,24 @@ export class ChatController {
       // Get user's wearables data
       const wearablesData = await this.getWearablesDataCached(userId);
 
+      // Get user to retrieve focusGoal
+      const user = await User.findOne({ firebaseUid: userId });
+
+      // Build goals array: prioritize passed goals, fallback to user's focusGoal
+      let goalsArray = goals || [];
+      if (goalsArray.length === 0 && user?.focusGoal?.label) {
+        goalsArray = [user.focusGoal.label];
+        console.log(
+          "📌 Using user's focus goal for session:",
+          user.focusGoal.label,
+        );
+      }
+
       // Create session via H2Oasis AI
       const session = await this.h2oasisAI.createSession(wearablesData, {
         tags,
-        goals: goals || [],
-        mood: mood || "relaxed",
+        goals: goalsArray,
+        mood: mood || "",
         customPrompt,
       });
 
