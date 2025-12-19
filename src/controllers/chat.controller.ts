@@ -2,13 +2,16 @@ import { Request, Response } from "express";
 import { H2OasisAIService } from "../services/h2oasis-ai.service";
 import { User } from "../models/User.model";
 import redisClient from "../utils/redis";
+import { SessionService } from "../services/session.service";
 
 export class ChatController {
   private h2oasisAI: H2OasisAIService;
+  private sessionService: SessionService;
   private readonly CACHE_TTL = 300; // 5 minutes cache
 
   constructor() {
     this.h2oasisAI = new H2OasisAIService();
+    this.sessionService = new SessionService();
   }
 
   sendMessage = async (req: Request, res: Response): Promise<void> => {
@@ -439,6 +442,44 @@ export class ChatController {
       });
 
       console.log("✅ Session created:", session.SessionName);
+
+      // Use a consistent sessionId per user so it updates instead of creating new
+      const consistentSessionId = `user-${userId}-default-session`;
+      console.log(`🔑 Using consistent sessionId: ${consistentSessionId}`);
+
+      // Delete all old sessions for this user first
+      try {
+        const existingSessions = await this.sessionService.getUserSessions({ firebaseUid: userId });
+        for (const oldSession of existingSessions) {
+          if (oldSession.sessionId !== consistentSessionId) {
+            await this.sessionService.deleteSession(oldSession.sessionId, userId);
+          }
+        }
+        if (existingSessions.length > 0) {
+          console.log(`🗑️ Cleaned up old sessions`);
+        }
+      } catch (cleanupError) {
+        console.warn("⚠️ Failed to cleanup old sessions:", cleanupError);
+      }
+
+      // Save/update session to database (upsert)
+      try {
+        await this.sessionService.saveSession({
+          sessionId: consistentSessionId,
+          firebaseUid: userId,
+          SessionName: session.SessionName,
+          TotalDurationMinutes: session.TotalDurationMinutes,
+          RecommendedFor: session.RecommendedFor,
+          Steps: session.Steps,
+          Tips: session.Tips,
+          StartMessage: session.StartMessage,
+          CompletionMessage: session.CompletionMessage,
+        });
+        console.log("💾 Session saved to database");
+      } catch (saveError) {
+        console.error("⚠️ Failed to save session to database:", saveError);
+        // Don't fail the request - session was created successfully
+      }
 
       res.status(201).json({
         success: true,
