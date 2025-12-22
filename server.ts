@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import swaggerUi from "swagger-ui-express";
+import { initSentry, Sentry } from "./src/config/sentry";
 import { swaggerSpec } from "./src/config/swagger";
 import { initializeFirebaseAdmin } from "./src/utils/firebase";
 import {
@@ -22,6 +23,9 @@ import { rookWebhookService } from "./src/services/webhooks.service";
 import profileRoutes from "./src/routes/profile.routes";
 import onboardingRoutes from "./src/routes/onboarding.routes";
 import sessionRoutes from "./src/routes/session.routes";
+
+// Initialize Sentry FIRST - before any other code
+initSentry();
 
 // Initialize Firebase Admin
 initializeFirebaseAdmin();
@@ -120,6 +124,9 @@ app.get(
 // ============================================
 // ERROR HANDLERS (Must be AFTER all routes!)
 // ============================================
+// Sentry error handler must be before other error handlers
+app.use(Sentry.expressErrorHandler());
+
 app.use(notFound);
 app.use(errorHandler);
 
