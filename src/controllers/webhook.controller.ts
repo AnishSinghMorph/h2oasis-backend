@@ -96,6 +96,7 @@ export const handleRookHealthDataWebhook = async (
 ): Promise<void> => {
   try {
     console.log("🔔 Received ROOK health data webhook");
+    console.log("🔍 Headers received:", JSON.stringify(req.headers, null, 2));
 
     const webhookData: any = req.body;
     const signature = req.headers["x-rook-hash"] as string;
@@ -112,17 +113,19 @@ export const handleRookHealthDataWebhook = async (
     const datetime =
       webhookData.datetime ||
       webhookData.health_score_data?.metadata?.datetime_string ||
-      webhookData.body_health?.summary?.body_summary?.metadata?.datetime ||
+      webhookData.body_health?.summary?.body_summary?.metadata?.datetime_string ||
       webhookData.physical_health?.summary?.physical_summary?.metadata
-        ?.datetime ||
-      webhookData.sleep_health?.summary?.sleep_summary?.metadata?.datetime ||
+        ?.datetime_string ||
+      webhookData.sleep_health?.summary?.sleep_summary?.metadata?.datetime_string ||
       webhookData.action_datetime;
 
-    // Only verify HMAC if signature header is present
+    // Validate required fields
     if (!client_uuid || !user_id) {
       console.error("❌ Missing required fields:", { client_uuid, user_id });
-      res.status(400).json({
-        error: "Missing required fields: client_uuid or user_id",
+      // Always return 200 to acknowledge webhook receipt
+      res.status(200).json({
+        success: false,
+        message: "Missing required fields: client_uuid or user_id",
       });
       return;
     }
@@ -138,7 +141,11 @@ export const handleRookHealthDataWebhook = async (
 
       if (!isValid) {
         console.error("❌ Invalid ROOK webhook signature");
-        res.status(401).json({ error: "Invalid signature" });
+        // Always return 200 to acknowledge webhook receipt
+        res.status(200).json({ 
+          success: false,
+          message: "Invalid signature" 
+        });
         return;
       }
 
@@ -255,7 +262,14 @@ export const handleRookHealthDataWebhook = async (
     });
   } catch (error) {
     console.error("❌ Error processing ROOK health data webhook:", error);
-    res.status(500).json({ error: "Internal server error" });
+    
+    // CRITICAL: Always return 200 to ROOK, even on errors
+    // Otherwise ROOK will retry and mark webhook as failed
+    res.status(200).json({ 
+      success: false,
+      message: "Webhook received but processing failed",
+      error: error instanceof Error ? error.message : "Unknown error"
+    });
   }
 };
 
@@ -269,6 +283,7 @@ export const handleRookNotificationWebhook = async (
 ): Promise<void> => {
   try {
     console.log("🔔 Received ROOK notification webhook");
+    console.log("🔍 Headers received:", JSON.stringify(req.headers, null, 2));
     console.log(
       "🔍 Full notification payload:",
       JSON.stringify(req.body, null, 2),
@@ -286,8 +301,10 @@ export const handleRookNotificationWebhook = async (
     // Notifications may not have user_id (e.g., error notifications)
     if (!client_uuid) {
       console.error("❌ Missing required field: client_uuid");
-      res.status(400).json({
-        error: "Missing required field: client_uuid",
+      // Always return 200 to acknowledge webhook receipt
+      res.status(200).json({
+        success: false,
+        message: "Missing required field: client_uuid",
       });
       return;
     }
@@ -303,7 +320,11 @@ export const handleRookNotificationWebhook = async (
 
       if (!isValid) {
         console.error("❌ Invalid ROOK webhook signature");
-        res.status(401).json({ error: "Invalid signature" });
+        // Always return 200 to acknowledge webhook receipt
+        res.status(200).json({ 
+          success: false,
+          message: "Invalid signature" 
+        });
         return;
       }
 
@@ -411,6 +432,7 @@ export const handleRookNotificationWebhook = async (
 
     // Return success response
     res.status(200).json({
+      success: true,
       message: "Notification processed successfully",
       action: action,
       user_id: user_id,
@@ -418,7 +440,14 @@ export const handleRookNotificationWebhook = async (
     });
   } catch (error) {
     console.error("❌ Error processing ROOK notification webhook:", error);
-    res.status(500).json({ error: "Internal server error" });
+    
+    // CRITICAL: Always return 200 to ROOK, even on errors
+    // Otherwise ROOK will retry and mark webhook as failed
+    res.status(200).json({ 
+      success: false,
+      message: "Webhook received but processing failed",
+      error: error instanceof Error ? error.message : "Unknown error"
+    });
   }
 };
 
