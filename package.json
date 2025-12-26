@@ -11,6 +11,8 @@
     "dev": "ts-node server.ts",
     "start": "node lib/server.js",
     "start:dev": "nodemon --watch src --ext ts,js,json --exec ts-node server.ts",
+    "worker": "node lib/src/workers/webhook-consumer.worker.js",
+    "worker:dev": "nodemon --watch src --ext ts,js,json --exec ts-node src/workers/webhook-consumer.worker.ts",
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
     "deploy": "firebase deploy --only functions",
@@ -77,6 +79,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@aws-sdk/client-sqs": "^3.957.0",
     "@types/jest": "^29.5.14",
     "@types/multer": "^2.0.0",
     "@types/multer-s3": "^3.0.3",

@@ -63,15 +63,18 @@ export class WebhookProcessor {
 
       console.log(`📝 Data type mapped to: ${dataType}`);
 
-      // Get user
+      // Get user by MongoDB _id (ROOK sends MongoDB ObjectId)
       const user = await User.findById(userId);
 
       if (!user) {
+        console.warn(`⚠️ User not found for ID: ${userId}`);
         return {
           success: false,
           message: "User not found",
         };
       }
+
+      console.log(`✅ Found user: ${user.firebaseUid}`);
 
       // Build atomic update path
       const updateField = `wearables.${wearableName}.data.${dataType}`;

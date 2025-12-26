@@ -1,40 +1,13 @@
 import { Request, Response } from "express";
 import crypto from "crypto";
 import { User } from "../models/User.model";
-import { HealthDataTransformer } from "../services/healthData.transformer.service";
-import { HealthDataMerger } from "../services/healthData.merger.service";
-import { IRookWebhookPayload } from "../models/HealthData.types";
-import { WebhookProcessor } from "../services/webhook.processor.service";
+import { sendToQueue } from "../config/sqs"; // SQS Producer
+import { RawWebhook } from "../models/RawWebhook.model"; // Store raw webhooks
 
 /**
  * ROOK Webhook Controller
  * Handles incoming webhooks from ROOK for health data and notifications
  */
-
-interface RookWebhookPayload {
-  user_id: string;
-  data_source: string;
-  webhook_type: "data" | "notification";
-  event_type?: string;
-  timestamp: string;
-  data?: any;
-  sleep_health?: any;
-  physical_health?: any;
-  body_health?: any;
-  document_version?: number;
-}
-
-interface NotificationPayload {
-  user_id: string;
-  data_source: string;
-  event_type:
-    | "connection_established"
-    | "connection_revoked"
-    | "user_created"
-    | "user_deleted";
-  timestamp: string;
-  details?: any;
-}
 
 /**
  * Verify HMAC signature from ROOK webhook
@@ -187,26 +160,18 @@ export const handleRookHealthDataWebhook = async (
     console.log("🔍 Data source:", data_source);
     console.log("📋 Data structure:", data_structure);
 
-    // Validate ObjectId format before querying
-    if (
-      !user_id ||
-      user_id.length !== 24 ||
-      !/^[0-9a-fA-F]{24}$/.test(user_id)
-    ) {
-      console.warn(`⚠️ Invalid user_id format: ${user_id}`);
-      res
-        .status(200)
-        .json({ message: "Invalid user_id format, webhook acknowledged" });
-      return;
-    }
+    // 🚀 NEW QUEUE-BASED ARCHITECTURE
+    // Step 1: Store raw webhook FIRST (immutable audit log)
+    // Don't validate user yet - just store and queue
+    const rawWebhook = await RawWebhook.create({
+      provider: "rook",
+      externalUserId: user_id,
+      dataStructure: data_structure,
+      payload: webhookData,
+      receivedAt: new Date(),
+    });
 
-    const user = await User.findById(user_id);
-
-    if (!user) {
-      console.warn(`⚠️ User not found for ROOK user_id: ${user_id}`);
-      res.status(200).json({ message: "User not found, webhook acknowledged" });
-      return;
-    }
+    console.log(`💾 Raw webhook stored: ${rawWebhook._id}`);
 
     // Map ROOK data source to our wearable names
     const dataSourceMap: { [key: string]: string } = {
@@ -221,45 +186,47 @@ export const handleRookHealthDataWebhook = async (
       polar: "polar",
     };
 
-    const wearableName = dataSourceMap[data_source.toLowerCase()];
+    const wearableName = dataSourceMap[data_source.toLowerCase()] || "unknown";
 
-    if (!wearableName) {
-      console.warn(`⚠️ Unknown data source: ${data_source}`);
-      res
-        .status(200)
-        .json({ message: "Unknown data source, webhook acknowledged" });
-      return;
-    }
-
-    const payload: IRookWebhookPayload = webhookData;
-
-    // ✅ Use WebhookProcessor with retry logic
-    const result = await WebhookProcessor.processWebhook(
-      user_id,
+    // Step 2: Send to SQS queue for async processing
+    const messageBody = {
+      rawWebhookId: (rawWebhook._id as any).toString(),
+      userId: user_id,
       wearableName,
-      data_structure,
-      payload,
-    );
+      dataStructure: data_structure,
+      payload: webhookData,
+    };
 
-    if (!result.success) {
-      console.warn(`⚠️ ${result.message}`);
-      res
-        .status(200)
-        .json({ message: result.message, webhook_acknowledged: true });
+    try {
+      const messageId = await sendToQueue(messageBody);
+      console.log(`📤 Webhook queued to SQS: ${messageId}`);
+
+      // Update raw webhook with SQS message ID
+      await RawWebhook.findByIdAndUpdate(rawWebhook._id, {
+        sqsMessageId: messageId,
+      });
+
+      // Step 3: Return 200 immediately (fast ingress!)
+      res.status(200).json({
+        success: true,
+        message: "Webhook received and queued for processing",
+        messageId,
+      });
+      return;
+    } catch (queueError) {
+      console.error("❌ Failed to queue webhook:", queueError);
+      
+      // If queuing fails, mark raw webhook as failed
+      await RawWebhook.findByIdAndUpdate(rawWebhook._id, {
+        error: queueError instanceof Error ? queueError.message : "Queue error",
+      });
+
+      res.status(500).json({
+        success: false,
+        message: "Failed to queue webhook for processing",
+      });
       return;
     }
-
-    console.log(`📊 Data type updated: ${result.dataType}`);
-
-    res.status(200).json({
-      success: true,
-      message: "Health data processed and merged successfully",
-      user_id: user_id,
-      wearable: wearableName,
-      data_type: result.dataType,
-      data_structure: data_structure,
-      processed_at: new Date().toISOString(),
-    });
   } catch (error) {
     console.error("❌ Error processing ROOK health data webhook:", error);
     
@@ -276,6 +243,7 @@ export const handleRookHealthDataWebhook = async (
 /**
  * Handle ROOK Notification Webhooks
  * Receives connection status and user lifecycle notifications
+ * Note: Notification webhooks do NOT include x-rook-hash (no HMAC verification)
  */
 export const handleRookNotificationWebhook = async (
   req: Request,
@@ -283,75 +251,29 @@ export const handleRookNotificationWebhook = async (
 ): Promise<void> => {
   try {
     console.log("🔔 Received ROOK notification webhook");
-    console.log("🔍 Headers received:", JSON.stringify(req.headers, null, 2));
     console.log(
       "🔍 Full notification payload:",
       JSON.stringify(req.body, null, 2),
     );
 
     const notificationData: any = req.body;
-    const signature = req.headers["x-rook-hash"] as string;
 
-    // Extract required fields for HMAC verification
+    // Extract fields
     const client_uuid = notificationData.client_uuid;
     const user_id = notificationData.user_id;
-    const datetime =
-      notificationData.action_datetime || notificationData.datetime;
+    const action = notificationData.action;
+    const data_source = notificationData.data_source;
+    const level = notificationData.level;
+    const message = notificationData.message;
 
-    // Notifications may not have user_id (e.g., error notifications)
     if (!client_uuid) {
       console.error("❌ Missing required field: client_uuid");
-      // Always return 200 to acknowledge webhook receipt
       res.status(200).json({
         success: false,
         message: "Missing required field: client_uuid",
       });
       return;
     }
-
-    // Verify HMAC signature (only if all required fields are present)
-    if (signature && user_id && datetime) {
-      const isValid = verifyRookSignature(
-        client_uuid,
-        user_id,
-        datetime,
-        signature,
-      );
-
-      if (!isValid) {
-        console.error("❌ Invalid ROOK webhook signature");
-        // Always return 200 to acknowledge webhook receipt
-        res.status(200).json({ 
-          success: false,
-          message: "Invalid signature" 
-        });
-        return;
-      }
-
-      console.log("✅ ROOK webhook signature verified");
-    } else {
-      if (!signature) {
-        console.warn(
-          "⚠️  No x-rook-hash header provided - webhook not verified",
-        );
-      }
-      if (!user_id) {
-        console.warn(
-          "⚠️  No user_id in notification - HMAC verification skipped",
-        );
-      }
-      if (!datetime) {
-        console.warn("⚠️  No datetime found - HMAC verification skipped");
-      }
-    }
-
-    // ROOK notification format: action, client_uuid, user_id, data_source, level, message, action_datetime, environment
-    const action = notificationData.action; // e.g., "user_connected", "user_disconnected"
-    const data_source = notificationData.data_source;
-    const level = notificationData.level; // e.g., "info", "warning", "error"
-    const message = notificationData.message;
-    const action_datetime = notificationData.action_datetime;
-    const environment = notificationData.environment;
 
     console.log("📢 Processing notification action:", action);
     console.log("👤 User:", user_id);
@@ -360,7 +282,7 @@ export const handleRookNotificationWebhook = async (
     console.log("⚠️ Level:", level);
     console.log("💬 Message:", message);
 
-    // Validate ObjectId format for user operations
+    // Validate MongoDB ObjectId format (24 hex characters)
     const hasValidUserId =
       user_id && user_id.length === 24 && /^[0-9a-fA-F]{24}$/.test(user_id);
 
@@ -374,10 +296,9 @@ export const handleRookNotificationWebhook = async (
       polar: "polar",
     };
 
-    const wearableName =
-      dataSourceMap[notificationData.data_source?.toLowerCase()];
+    const wearableName = dataSourceMap[data_source?.toLowerCase()];
 
-    // Handle different notification types (ROOK uses "action" field)
+    // Handle different notification types
     switch (action) {
       case "user_connected":
       case "connection_established":
