@@ -30,7 +30,7 @@ const PasswordResetSchema = new Schema<IPasswordReset>({
   expiresAt: {
     type: Date,
     required: true,
-    index: true, // TTL index will use this
+    // Note: TTL index is created separately below
   },
   createdAt: {
     type: Date,
