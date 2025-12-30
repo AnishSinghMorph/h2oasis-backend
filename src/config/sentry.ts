@@ -15,16 +15,14 @@ export const initSentry = () => {
   Sentry.init({
     dsn,
     environment: process.env.NODE_ENV || "development",
-    
+
     // Performance Monitoring
     tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
-    
+
     // Profiling
     profilesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
-    
-    integrations: [
-      nodeProfilingIntegration(),
-    ],
+
+    integrations: [nodeProfilingIntegration()],
 
     // Filter out sensitive data
     beforeSend(event) {
@@ -34,7 +32,7 @@ export const initSentry = () => {
         delete event.request.headers["cookie"];
         delete event.request.headers["x-firebase-uid"];
       }
-      
+
       // Remove sensitive environment variables
       if (event.contexts?.runtime?.env) {
         const env = event.contexts.runtime.env as Record<string, any>;

@@ -139,7 +139,7 @@ export class SessionController {
 
       const session = await this.sessionService.getSessionById(
         sessionId,
-        firebaseUid
+        firebaseUid,
       );
 
       if (!session) {
@@ -210,7 +210,7 @@ export class SessionController {
       const session = await this.sessionService.updateSession(
         sessionId,
         firebaseUid,
-        updates
+        updates,
       );
 
       if (!session) {
@@ -253,7 +253,7 @@ export class SessionController {
 
       const deleted = await this.sessionService.deleteSession(
         sessionId,
-        firebaseUid
+        firebaseUid,
       );
 
       if (!deleted) {

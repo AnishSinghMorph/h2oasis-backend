@@ -8,9 +8,9 @@ import {
 
 /**
  * AWS SQS Configuration
- * 
+ *
  * SQS (Simple Queue Service) = Message buffer between webhook ingress and processing
- * 
+ *
  * Why SQS?
  * - Decouple webhook receipt (fast) from processing (slow)
  * - Handle bursts of webhooks without overwhelming MongoDB
@@ -45,7 +45,7 @@ const QUEUE_NAMES = {
 
 /**
  * Get Queue URL from queue name
- * 
+ *
  * AWS requires full URL like: https://sqs.us-east-1.amazonaws.com/123456789/rook-health-webhooks
  * This function converts queue name → full URL
  */
@@ -62,9 +62,9 @@ async function getQueueUrl(queueName: string): Promise<string> {
 
 /**
  * SQS Producer - Send message to queue
- * 
+ *
  * This is called by the webhook controller to enqueue webhooks
- * 
+ *
  * @param messageBody - The webhook data to enqueue
  * @returns Message ID from SQS
  */
@@ -75,7 +75,7 @@ export async function sendToQueue(messageBody: any): Promise<string> {
     const command = new SendMessageCommand({
       QueueUrl: queueUrl,
       MessageBody: JSON.stringify(messageBody),
-      
+
       // Message attributes (metadata)
       MessageAttributes: {
         provider: {
@@ -91,7 +91,7 @@ export async function sendToQueue(messageBody: any): Promise<string> {
 
     const response = await sqsClient.send(command);
     console.log(`✅ Message sent to SQS: ${response.MessageId}`);
-    
+
     return response.MessageId!;
   } catch (error) {
     console.error("❌ Failed to send message to SQS:", error);
@@ -101,9 +101,9 @@ export async function sendToQueue(messageBody: any): Promise<string> {
 
 /**
  * SQS Consumer - Receive messages from queue
- * 
+ *
  * This is called by the worker to poll for new messages
- * 
+ *
  * @param maxMessages - How many messages to fetch (1-10)
  * @param waitTimeSeconds - Long polling duration (0-20 seconds)
  * @returns Array of messages
@@ -133,10 +133,10 @@ export async function receiveFromQueue(
 
 /**
  * Delete message from queue after successful processing
- * 
+ *
  * IMPORTANT: Only delete after processing succeeds!
  * If you delete before processing and worker crashes, message is lost forever.
- * 
+ *
  * @param receiptHandle - Unique handle for this message instance
  */
 export async function deleteFromQueue(receiptHandle: string): Promise<void> {

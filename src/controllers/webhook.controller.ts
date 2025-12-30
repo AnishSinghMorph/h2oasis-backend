@@ -86,10 +86,12 @@ export const handleRookHealthDataWebhook = async (
     const datetime =
       webhookData.datetime ||
       webhookData.health_score_data?.metadata?.datetime_string ||
-      webhookData.body_health?.summary?.body_summary?.metadata?.datetime_string ||
+      webhookData.body_health?.summary?.body_summary?.metadata
+        ?.datetime_string ||
       webhookData.physical_health?.summary?.physical_summary?.metadata
         ?.datetime_string ||
-      webhookData.sleep_health?.summary?.sleep_summary?.metadata?.datetime_string ||
+      webhookData.sleep_health?.summary?.sleep_summary?.metadata
+        ?.datetime_string ||
       webhookData.action_datetime;
 
     // Validate required fields
@@ -115,9 +117,9 @@ export const handleRookHealthDataWebhook = async (
       if (!isValid) {
         console.error("❌ Invalid ROOK webhook signature");
         // Always return 200 to acknowledge webhook receipt
-        res.status(200).json({ 
+        res.status(200).json({
           success: false,
-          message: "Invalid signature" 
+          message: "Invalid signature",
         });
         return;
       }
@@ -215,7 +217,7 @@ export const handleRookHealthDataWebhook = async (
       return;
     } catch (queueError) {
       console.error("❌ Failed to queue webhook:", queueError);
-      
+
       // If queuing fails, mark raw webhook as failed
       await RawWebhook.findByIdAndUpdate(rawWebhook._id, {
         error: queueError instanceof Error ? queueError.message : "Queue error",
@@ -229,13 +231,13 @@ export const handleRookHealthDataWebhook = async (
     }
   } catch (error) {
     console.error("❌ Error processing ROOK health data webhook:", error);
-    
+
     // CRITICAL: Always return 200 to ROOK, even on errors
     // Otherwise ROOK will retry and mark webhook as failed
-    res.status(200).json({ 
+    res.status(200).json({
       success: false,
       message: "Webhook received but processing failed",
-      error: error instanceof Error ? error.message : "Unknown error"
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -361,13 +363,13 @@ export const handleRookNotificationWebhook = async (
     });
   } catch (error) {
     console.error("❌ Error processing ROOK notification webhook:", error);
-    
+
     // CRITICAL: Always return 200 to ROOK, even on errors
     // Otherwise ROOK will retry and mark webhook as failed
-    res.status(200).json({ 
+    res.status(200).json({
       success: false,
       message: "Webhook received but processing failed",
-      error: error instanceof Error ? error.message : "Unknown error"
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
