@@ -15,7 +15,7 @@ export interface ISessionStep {
 export interface ISession extends Document {
   sessionId: string; // UUID from AI generation
   firebaseUid: string; // User who owns this session
-  
+
   // Session data from AI
   SessionName: string;
   TotalDurationMinutes: number;
@@ -24,11 +24,11 @@ export interface ISession extends Document {
   Tips: string[];
   StartMessage: string;
   CompletionMessage: string;
-  
+
   // User interaction metadata
   isCompleted: boolean;
   completedAt?: Date;
-  
+
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
@@ -65,7 +65,7 @@ const SessionStepSchema = new Schema<ISessionStep>(
       required: false,
     },
   },
-  { _id: false } // Don't create _id for subdocuments
+  { _id: false }, // Don't create _id for subdocuments
 );
 
 const SessionSchema = new Schema<ISession>(
@@ -122,7 +122,7 @@ const SessionSchema = new Schema<ISession>(
   },
   {
     timestamps: true, // Automatically adds createdAt and updatedAt
-  }
+  },
 );
 
 // Compound index for efficient queries

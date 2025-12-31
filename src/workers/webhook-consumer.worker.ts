@@ -1,16 +1,16 @@
 /**
  * SQS Webhook Consumer Worker
- * 
+ *
  * This worker polls SQS queue and processes webhook messages one at a time
  * Runs as a separate process from the main API server
- * 
+ *
  * ARCHITECTURE:
  * 1. Poll SQS queue (long polling = wait up to 5s for messages)
  * 2. Receive message
  * 3. Process webhook (transform data, update DB)
  * 4. Delete message from queue (only after success)
  * 5. Repeat
- * 
+ *
  * CONCURRENCY SAFETY:
  * - Processes ONE message at a time (no race conditions)
  * - If processing fails, message stays in queue
@@ -46,7 +46,8 @@ async function processMessage(message: any): Promise<void> {
   try {
     // Parse message body
     const messageBody = JSON.parse(message.Body);
-    const { rawWebhookId, userId, wearableName, dataStructure, payload } = messageBody;
+    const { rawWebhookId, userId, wearableName, dataStructure, payload } =
+      messageBody;
 
     console.log(`👤 User: ${userId}`);
     console.log(`⌚ Wearable: ${wearableName}`);
@@ -57,7 +58,7 @@ async function processMessage(message: any): Promise<void> {
       userId,
       wearableName,
       dataStructure,
-      payload
+      payload,
     );
 
     if (result.success) {
@@ -77,7 +78,7 @@ async function processMessage(message: any): Promise<void> {
     } else {
       // Processing failed
       console.error(`❌ Processing failed: ${result.message}`);
-      
+
       // Update raw webhook with error
       if (rawWebhookId) {
         await RawWebhook.findByIdAndUpdate(rawWebhookId, {
@@ -95,8 +96,10 @@ async function processMessage(message: any): Promise<void> {
         "No data extracted from webhook",
       ];
 
-      if (permanentFailures.some(msg => result.message.includes(msg))) {
-        console.warn(`⚠️ Permanent failure detected, removing from queue: ${result.message}`);
+      if (permanentFailures.some((msg) => result.message.includes(msg))) {
+        console.warn(
+          `⚠️ Permanent failure detected, removing from queue: ${result.message}`,
+        );
         await deleteFromQueue(message.ReceiptHandle);
       } else {
         // Temporary failures (network issues, DB timeout) - let it retry
@@ -105,7 +108,7 @@ async function processMessage(message: any): Promise<void> {
     }
   } catch (error) {
     console.error("❌ Error processing message:", error);
-    
+
     // Check if it's a permanent failure (invalid ObjectId, cast errors, etc.)
     const errorMessage = error instanceof Error ? error.message : String(error);
     const permanentErrorPatterns = [
@@ -116,14 +119,16 @@ async function processMessage(message: any): Promise<void> {
       "BSONError",
     ];
 
-    const isPermanentFailure = permanentErrorPatterns.some(pattern => 
-      errorMessage.includes(pattern)
+    const isPermanentFailure = permanentErrorPatterns.some((pattern) =>
+      errorMessage.includes(pattern),
     );
 
     if (isPermanentFailure) {
-      console.warn(`⚠️ Permanent failure detected (invalid data), removing from queue`);
+      console.warn(
+        `⚠️ Permanent failure detected (invalid data), removing from queue`,
+      );
       console.warn(`   Error: ${errorMessage}`);
-      
+
       // Mark raw webhook as failed
       const messageBody = JSON.parse(message.Body);
       if (messageBody.rawWebhookId) {
@@ -133,13 +138,13 @@ async function processMessage(message: any): Promise<void> {
           processedAt: new Date(),
         });
       }
-      
+
       // Delete from queue to prevent infinite retries
       await deleteFromQueue(message.ReceiptHandle);
       console.log(`🗑️ Invalid message deleted from queue`);
       return; // Don't throw - we handled it
     }
-    
+
     // Report temporary failures to Sentry
     Sentry.captureException(error, {
       tags: {
@@ -187,23 +192,22 @@ async function startWorker(): Promise<void> {
       // Process each message sequentially (one at a time)
       for (const message of messages) {
         if (isShuttingDown) break;
-        
+
         await processMessage(message);
       }
 
       // Small delay before next poll
-      await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL));
-
+      await new Promise((resolve) => setTimeout(resolve, POLLING_INTERVAL));
     } catch (error) {
       console.error("❌ Worker error:", error);
-      
+
       // Report to Sentry
       Sentry.captureException(error, {
         tags: { component: "webhook-consumer-loop" },
       });
 
       // Wait before retrying
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise((resolve) => setTimeout(resolve, 5000));
     }
   }
 
@@ -232,7 +236,7 @@ function setupGracefulShutdown(): void {
 // Start the worker
 if (require.main === module) {
   setupGracefulShutdown();
-  
+
   startWorker().catch((error) => {
     console.error("💥 Fatal worker error:", error);
     Sentry.captureException(error);

@@ -36,11 +36,11 @@ export class SessionService {
    */
   async saveSession(input: CreateSessionInput): Promise<ISession> {
     console.log(`💾 saveSession called with sessionId: ${input.sessionId}`);
-    
+
     // Check if session already exists for this user
-    const existingSession = await Session.findOne({ 
+    const existingSession = await Session.findOne({
       firebaseUid: input.firebaseUid,
-      sessionId: input.sessionId 
+      sessionId: input.sessionId,
     });
 
     if (existingSession) {
@@ -52,9 +52,11 @@ export class SessionService {
       existingSession.Tips = input.Tips;
       existingSession.StartMessage = input.StartMessage;
       existingSession.CompletionMessage = input.CompletionMessage;
-      
+
       await existingSession.save();
-      console.log(`🔄 Session updated: ${existingSession.SessionName} (${existingSession.sessionId})`);
+      console.log(
+        `🔄 Session updated: ${existingSession.SessionName} (${existingSession.sessionId})`,
+      );
       return existingSession;
     }
 
@@ -75,7 +77,9 @@ export class SessionService {
     const session = new Session(sessionData);
     await session.save();
 
-    console.log(`✅ Session saved: ${session.SessionName} (${session.sessionId})`);
+    console.log(
+      `✅ Session saved: ${session.SessionName} (${session.sessionId})`,
+    );
     return session;
   }
 
@@ -94,16 +98,24 @@ export class SessionService {
       .sort({ createdAt: -1 }) // Most recent first
       .lean<ISession[]>();
 
-    console.log(`📋 Found ${sessions.length} sessions for user ${filters.firebaseUid}`);
+    console.log(
+      `📋 Found ${sessions.length} sessions for user ${filters.firebaseUid}`,
+    );
     return sessions;
   }
 
   /**
    * Get a single session by ID
    */
-  async getSessionById(sessionId: string, firebaseUid: string): Promise<ISession | null> {
-    const session = await Session.findOne({ sessionId, firebaseUid }).lean<ISession>();
-    
+  async getSessionById(
+    sessionId: string,
+    firebaseUid: string,
+  ): Promise<ISession | null> {
+    const session = await Session.findOne({
+      sessionId,
+      firebaseUid,
+    }).lean<ISession>();
+
     if (!session) {
       console.warn(`⚠️ Session not found: ${sessionId}`);
       return null;
@@ -118,18 +130,28 @@ export class SessionService {
   async updateSession(
     sessionId: string,
     firebaseUid: string,
-    updates: UpdateSessionInput
+    updates: UpdateSessionInput,
   ): Promise<ISession | null> {
     // If marking as completed, set completedAt timestamp
     if (updates.isCompleted === true && !updates.completedAt) {
       updates.completedAt = new Date();
     }
 
-    const session = await Session.findOneAndUpdate(
-      { sessionId, firebaseUid },
+    // Try to find by MongoDB _id first, then fall back to sessionId field
+    let session = await Session.findOneAndUpdate(
+      { _id: sessionId, firebaseUid },
       { $set: updates },
-      { new: true } // Return updated document
+      { new: true }, // Return updated document
     );
+
+    // If not found by _id, try by sessionId field
+    if (!session) {
+      session = await Session.findOneAndUpdate(
+        { sessionId, firebaseUid },
+        { $set: updates },
+        { new: true },
+      );
+    }
 
     if (!session) {
       console.warn(`⚠️ Session not found for update: ${sessionId}`);
@@ -143,7 +165,10 @@ export class SessionService {
   /**
    * Delete a session
    */
-  async deleteSession(sessionId: string, firebaseUid: string): Promise<boolean> {
+  async deleteSession(
+    sessionId: string,
+    firebaseUid: string,
+  ): Promise<boolean> {
     const result = await Session.deleteOne({ sessionId, firebaseUid });
 
     if (result.deletedCount === 0) {

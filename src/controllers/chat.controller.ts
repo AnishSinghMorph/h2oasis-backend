@@ -449,10 +449,15 @@ export class ChatController {
 
       // Delete all old sessions for this user first
       try {
-        const existingSessions = await this.sessionService.getUserSessions({ firebaseUid: userId });
+        const existingSessions = await this.sessionService.getUserSessions({
+          firebaseUid: userId,
+        });
         for (const oldSession of existingSessions) {
           if (oldSession.sessionId !== consistentSessionId) {
-            await this.sessionService.deleteSession(oldSession.sessionId, userId);
+            await this.sessionService.deleteSession(
+              oldSession.sessionId,
+              userId,
+            );
           }
         }
         if (existingSessions.length > 0) {
