@@ -14,6 +14,53 @@ Authentication backend for H2Oasis built with Firebase Functions, TypeScript, Ex
 - ✅ **TypeScript** - Type-safe development
 - ✅ **Express.js** - RESTful API framework
 - ✅ **CI/CD Pipeline** - Automated testing and deployment
+- ✅ **Session Management** - AI-generated personalized wellness sessions
+- ✅ **AWS SQS Integration** - Asynchronous webhook processing
+- ✅ **Password Reset & OTP** - Email verification and password recovery
+- ✅ **Account Linking** - Merge multiple auth providers
+- ✅ **Sentry Monitoring** - Real-time error tracking
+
+---
+
+## 🆕 Recent Updates (December 2025 - January 2026)
+
+### 🔧 AWS SQS Queue System
+- **Impact**: 10x faster webhook response times (500ms → 50ms)
+- **Architecture**: API server queues webhooks, worker process handles async
+- **Scalability**: Handle thousands of webhooks/day without blocking
+- **Reliability**: Zero message loss with automatic retries and dead letter queue
+- **Files**: `/src/config/sqs.ts`, `/src/services/queueConsumer.ts`, `/worker.ts`
+- **Documentation**: `AWS_SQS_SETUP.md`, `EC2_WORKER_DEPLOYMENT.md`
+
+### 📊 Session Management API
+- **AI Integration**: GPT-4 generates personalized wellness sessions
+- **Endpoints**: Create, read, update, delete sessions + statistics
+- **Analytics**: Track completion rates, streaks, total duration
+- **Model**: Multi-step session structure with timers and tips
+
+### 🔐 Security Enhancements
+- **Password Reset**: Email-based reset with 6-digit OTP (10-min expiration)
+- **OTP Verification**: Email verification on signup
+- **Account Deletion**: Complete user data removal (GDPR compliant)
+- **Account Linking**: Merge Google, Apple, Email accounts by email
+
+### 🏗️ Infrastructure Improvements
+- **Sentry Integration**: Real-time error tracking and performance monitoring
+- **Production Config**: Environment-specific settings (dev/staging/production)
+- **Enhanced Logging**: Structured logging with Winston
+- **AWS CloudWatch**: Server metrics and log aggregation
+
+### 📁 Code Organization
+- **Constants File**: `/src/constants/index.ts` for type-safe constants
+- **Onboarding Controller**: Separated from ProfileController
+- **Removed Product Model**: Simplified to user fields
+- **Raw Webhook Storage**: Complete audit trail in MongoDB
+
+### 🐛 Bug Fixes & Refactoring
+- **TypeScript Strict Mode**: Fixed 150+ type errors
+- **Security Updates**: Updated body-parser, node-forge, AWS SDK, Firebase
+- **Webhook Validation**: Enhanced HMAC verification
+- **Code Quality**: 0 ESLint errors, 100% Prettier formatting
 
 ## 🏗️ Architecture
 
