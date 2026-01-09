@@ -1,5 +1,6 @@
 import { Session, ISession, ISessionStep } from "../models/Session.model";
 import { v4 as uuidv4 } from "uuid";
+import { sessionCacheService } from "./sessionCache.service";
 
 interface CreateSessionInput {
   sessionId?: string; // Optional - generated if not provided
@@ -44,7 +45,7 @@ export class SessionService {
     });
 
     if (existingSession) {
-      // Update existing session
+      // Update existing session in MongoDB
       existingSession.SessionName = input.SessionName;
       existingSession.TotalDurationMinutes = input.TotalDurationMinutes;
       existingSession.RecommendedFor = input.RecommendedFor;
@@ -57,6 +58,13 @@ export class SessionService {
       console.log(
         `🔄 Session updated: ${existingSession.SessionName} (${existingSession.sessionId})`,
       );
+
+      // Write-through cache: Update Redis after MongoDB save
+      await sessionCacheService.addSessionToCache(
+        input.firebaseUid,
+        existingSession.toObject() as ISession,
+      );
+
       return existingSession;
     }
 
@@ -80,13 +88,35 @@ export class SessionService {
     console.log(
       `✅ Session saved: ${session.SessionName} (${session.sessionId})`,
     );
+
+    // Write-through cache: Add new session to Redis
+    await sessionCacheService.addSessionToCache(
+      input.firebaseUid,
+      session.toObject() as ISession,
+    );
+
     return session;
   }
 
   /**
    * Get all sessions for a user with optional filters
+   * Uses Redis cache for faster reads, falls back to MongoDB
    */
   async getUserSessions(filters: SessionFilters): Promise<ISession[]> {
+    // Only use cache for unfiltered requests (most common case)
+    if (filters.isCompleted === undefined) {
+      // Try Redis cache first
+      const cachedSessions = await sessionCacheService.getUserSessions(
+        filters.firebaseUid,
+      );
+
+      if (cachedSessions) {
+        // Cache hit - return immediately
+        return cachedSessions;
+      }
+    }
+
+    // Cache miss or filtered request - query MongoDB
     const query: any = { firebaseUid: filters.firebaseUid };
 
     // Add optional filters
@@ -99,8 +129,17 @@ export class SessionService {
       .lean<ISession[]>();
 
     console.log(
-      `📋 Found ${sessions.length} sessions for user ${filters.firebaseUid}`,
+      `📋 Found ${sessions.length} sessions for user ${filters.firebaseUid} (from MongoDB)`,
     );
+
+    // Populate cache for unfiltered requests
+    if (filters.isCompleted === undefined) {
+      await sessionCacheService.cacheUserSessions(
+        filters.firebaseUid,
+        sessions,
+      );
+    }
+
     return sessions;
   }
 
@@ -159,6 +198,13 @@ export class SessionService {
     }
 
     console.log(`✅ Session updated: ${session.SessionName} (${sessionId})`);
+
+    // Update cache with the modified session
+    await sessionCacheService.addSessionToCache(
+      firebaseUid,
+      session.toObject() as ISession,
+    );
+
     return session;
   }
 
@@ -177,6 +223,10 @@ export class SessionService {
     }
 
     console.log(`🗑️ Session deleted: ${sessionId}`);
+
+    // Remove from cache
+    await sessionCacheService.removeSessionFromCache(firebaseUid, sessionId);
+
     return true;
   }
 
