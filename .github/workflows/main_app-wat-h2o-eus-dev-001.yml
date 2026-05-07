@@ -26,7 +26,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-audit --no-fund
 
       - name: Build TypeScript
         run: npm run build
@@ -54,7 +54,7 @@ jobs:
           name: node-app
 
       - name: Install production dependencies
-        run: npm install --omit=dev
+        run: npm install --omit=dev --no-audit --no-fund
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
