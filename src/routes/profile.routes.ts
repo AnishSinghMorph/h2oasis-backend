@@ -2,7 +2,7 @@ import { Router } from "express";
 import { ProfileController } from "../controllers/profile.controller";
 import { verifyFirebaseToken } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/essential.middleware";
-import upload from "../utils/s3Upload";
+import upload from "../utils/blobStorage";
 
 const router = Router();
 

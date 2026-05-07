@@ -1,28 +1,40 @@
 /**
- * SQS Webhook Consumer Worker
+ * Azure Service Bus Webhook Consumer Worker
+ * (Replaces the old AWS SQS consumer worker)
  *
- * This worker polls SQS queue and processes webhook messages one at a time
+ * This worker polls the Azure Service Bus queue and processes webhook messages one at a time
  * Runs as a separate process from the main API server
  *
  * ARCHITECTURE:
- * 1. Poll SQS queue (long polling = wait up to 5s for messages)
+ * 1. Poll Service Bus queue (wait up to 5s for messages)
  * 2. Receive message
  * 3. Process webhook (transform data, update DB)
- * 4. Delete message from queue (only after success)
+ * 4. Complete message (remove from queue — only after success)
  * 5. Repeat
  *
  * CONCURRENCY SAFETY:
  * - Processes ONE message at a time (no race conditions)
- * - If processing fails, message stays in queue
- * - After 3 failed attempts, message goes to Dead Letter Queue (DLQ)
+ * - If processing fails, message is "abandoned" (stays in queue for retry)
+ * - After max delivery attempts, Service Bus moves message to Dead Letter Queue automatically
  * - Worker can crash/restart without data loss
+ *
+ * KEY DIFFERENCE FROM SQS:
+ * - SQS: deleteFromQueue(receiptHandle) — you pass a string handle
+ * - Service Bus: completeMessage(message) — you pass the full message object
  */
 
 // Load environment variables FIRST before any other imports
 import dotenv from "dotenv";
 dotenv.config();
 
-import { receiveFromQueue, deleteFromQueue } from "../config/sqs";
+import {
+  receiveFromQueue,
+  completeMessage,
+  abandonMessage,
+  deadLetterMessage,
+  closeServiceBus,
+} from "../config/sqs";
+import { ServiceBusReceivedMessage } from "@azure/service-bus";
 import { WebhookProcessor } from "../services/webhook.processor.service";
 import { RawWebhook } from "../models/RawWebhook.model";
 import { DatabaseService } from "../utils/database";
@@ -37,15 +49,21 @@ const WAIT_TIME_SECONDS = 5; // Long polling timeout
 let isShuttingDown = false;
 
 /**
- * Process a single webhook message from SQS
+ * Process a single webhook message from Service Bus
  */
-async function processMessage(message: any): Promise<void> {
+async function processMessage(
+  message: ServiceBusReceivedMessage,
+): Promise<void> {
   const startTime = Date.now();
-  console.log(`\n🔄 Processing SQS message: ${message.MessageId}`);
+  console.log(`\n🔄 Processing Service Bus message: ${message.messageId}`);
 
   try {
     // Parse message body
-    const messageBody = JSON.parse(message.Body);
+    // Service Bus stores body as object directly (not stringified like SQS)
+    const messageBody =
+      typeof message.body === "string"
+        ? JSON.parse(message.body)
+        : message.body;
     const { rawWebhookId, userId, wearableName, dataStructure, payload } =
       messageBody;
 
@@ -70,8 +88,8 @@ async function processMessage(message: any): Promise<void> {
         });
       }
 
-      // Delete message from SQS (success!)
-      await deleteFromQueue(message.ReceiptHandle);
+      // Complete the message (remove from queue — success!)
+      await completeMessage(message);
 
       const duration = Date.now() - startTime;
       console.log(`✅ Message processed successfully in ${duration}ms`);
@@ -89,7 +107,7 @@ async function processMessage(message: any): Promise<void> {
       }
 
       // Permanent failures (user not found, unknown structure, invalid data)
-      // should be deleted from queue to prevent infinite retries
+      // should be dead-lettered to prevent infinite retries
       const permanentFailures = [
         "User not found",
         "Unknown data type",
@@ -98,11 +116,12 @@ async function processMessage(message: any): Promise<void> {
 
       if (permanentFailures.some((msg) => result.message.includes(msg))) {
         console.warn(
-          `⚠️ Permanent failure detected, removing from queue: ${result.message}`,
+          `⚠️ Permanent failure detected, sending to dead-letter queue: ${result.message}`,
         );
-        await deleteFromQueue(message.ReceiptHandle);
+        await deadLetterMessage(message, result.message);
       } else {
-        // Temporary failures (network issues, DB timeout) - let it retry
+        // Temporary failures (network issues, DB timeout) - abandon for retry
+        await abandonMessage(message);
         throw new Error(result.message);
       }
     }
@@ -125,12 +144,15 @@ async function processMessage(message: any): Promise<void> {
 
     if (isPermanentFailure) {
       console.warn(
-        `⚠️ Permanent failure detected (invalid data), removing from queue`,
+        `⚠️ Permanent failure detected (invalid data), sending to dead-letter queue`,
       );
       console.warn(`   Error: ${errorMessage}`);
 
       // Mark raw webhook as failed
-      const messageBody = JSON.parse(message.Body);
+      const messageBody =
+        typeof message.body === "string"
+          ? JSON.parse(message.body)
+          : message.body;
       if (messageBody.rawWebhookId) {
         await RawWebhook.findByIdAndUpdate(messageBody.rawWebhookId, {
           error: errorMessage,
@@ -139,9 +161,9 @@ async function processMessage(message: any): Promise<void> {
         });
       }
 
-      // Delete from queue to prevent infinite retries
-      await deleteFromQueue(message.ReceiptHandle);
-      console.log(`🗑️ Invalid message deleted from queue`);
+      // Dead-letter the message (permanent failure — moves to separate DLQ)
+      await deadLetterMessage(message, errorMessage);
+      console.log(`💀 Invalid message sent to dead-letter queue`);
       return; // Don't throw - we handled it
     }
 
@@ -149,27 +171,33 @@ async function processMessage(message: any): Promise<void> {
     Sentry.captureException(error, {
       tags: {
         component: "webhook-consumer",
-        messageId: message.MessageId,
+        messageId: String(message.messageId),
       },
       extra: {
-        messageBody: message.Body,
+        messageBody: message.body,
       },
     });
 
-    // Don't delete message - let SQS retry (temporary failure)
+    // Abandon message — Service Bus will make it available for retry
+    try {
+      await abandonMessage(message);
+    } catch (abandonError) {
+      console.error("❌ Failed to abandon message:", abandonError);
+    }
+
     throw error;
   }
 }
 
 /**
  * Main worker loop
- * Continuously polls SQS and processes messages
+ * Continuously polls Service Bus and processes messages
  */
 async function startWorker(): Promise<void> {
-  console.log("🚀 Starting SQS Webhook Consumer Worker");
+  console.log("🚀 Starting Service Bus Webhook Consumer Worker");
   console.log(`📊 Polling interval: ${POLLING_INTERVAL}ms`);
   console.log(`📥 Max messages per poll: ${MAX_MESSAGES}`);
-  console.log(`⏱️  Long polling timeout: ${WAIT_TIME_SECONDS}s\n`);
+  console.log(`⏱️  Wait timeout: ${WAIT_TIME_SECONDS}s\n`);
 
   // Connect to MongoDB
   await DatabaseService.connect();
@@ -178,11 +206,11 @@ async function startWorker(): Promise<void> {
   // Main polling loop
   while (!isShuttingDown) {
     try {
-      // Poll SQS for messages
+      // Poll Service Bus for messages
       const messages = await receiveFromQueue(MAX_MESSAGES, WAIT_TIME_SECONDS);
 
       if (messages.length === 0) {
-        // No messages - long polling timeout
+        // No messages — wait timeout reached
         console.log("💤 No messages in queue, continuing to poll...");
         continue;
       }
@@ -218,9 +246,12 @@ async function startWorker(): Promise<void> {
  * Graceful shutdown handler
  */
 function setupGracefulShutdown(): void {
-  const shutdown = (signal: string) => {
+  const shutdown = async (signal: string) => {
     console.log(`\n📢 Received ${signal}, initiating graceful shutdown...`);
     isShuttingDown = true;
+
+    // Close Service Bus connection
+    await closeServiceBus();
 
     // Give worker 30s to finish current message
     setTimeout(() => {

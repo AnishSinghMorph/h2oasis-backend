@@ -1,171 +1,236 @@
-import {
-  SQSClient,
-  SendMessageCommand,
-  ReceiveMessageCommand,
-  DeleteMessageCommand,
-  GetQueueUrlCommand,
-} from "@aws-sdk/client-sqs";
-
 /**
- * AWS SQS Configuration
+ * Azure Service Bus Configuration
+ * (Replaces the old AWS SQS configuration)
  *
- * SQS (Simple Queue Service) = Message buffer between webhook ingress and processing
+ * Service Bus = Azure's message queue service (same concept as SQS)
  *
- * Why SQS?
+ * WHY A MESSAGE QUEUE?
  * - Decouple webhook receipt (fast) from processing (slow)
  * - Handle bursts of webhooks without overwhelming MongoDB
  * - Automatic retries if processing fails
  * - No data loss even if worker crashes
+ *
+ * KEY DIFFERENCES FROM SQS:
+ * - SQS: You "poll" for messages (ask repeatedly "any new messages?")
+ * - Service Bus: You can also "receive" which is similar polling, or use "subscribe"
+ * - Service Bus has built-in dead-letter queue (no separate setup needed)
+ * - Messages are "completed" (deleted) or "abandoned" (retry)
  */
 
-// Initialize SQS Client
-const accessKeyId = process.env.AWS_ACCESS_KEY_ID?.trim();
-const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY?.trim();
-const region = process.env.AWS_REGION?.trim() || "us-east-1";
+import {
+  ServiceBusClient,
+  ServiceBusMessage,
+  ServiceBusReceivedMessage,
+  ServiceBusSender,
+  ServiceBusReceiver,
+} from "@azure/service-bus";
 
-if (!accessKeyId || !secretAccessKey) {
-  console.error("❌ AWS credentials not found in environment variables");
-  console.error("AWS_ACCESS_KEY_ID:", accessKeyId ? "SET" : "MISSING");
-  console.error("AWS_SECRET_ACCESS_KEY:", secretAccessKey ? "SET" : "MISSING");
+// ============================================
+// CLIENT SETUP
+// ============================================
+
+const connectionString = process.env.AZURE_SERVICE_BUS_CONNECTION_STRING;
+const queueName = process.env.AZURE_SERVICE_BUS_QUEUE_NAME || "task-queue";
+
+if (!connectionString) {
+  console.error(
+    "❌ AZURE_SERVICE_BUS_CONNECTION_STRING not found in environment variables",
+  );
 }
 
-const sqsClient = new SQSClient({
-  region,
-  credentials: {
-    accessKeyId: accessKeyId!,
-    secretAccessKey: secretAccessKey!,
-  },
-});
+// Create the Service Bus client (main entry point)
+let serviceBusClient: ServiceBusClient | null = null;
+let sender: ServiceBusSender | null = null;
 
-// Queue names
-const QUEUE_NAMES = {
-  HEALTH_WEBHOOKS: "rook-health-webhooks",
-  DEAD_LETTER: "rook-health-webhooks-dlq", // Failed messages go here after 3 retries
-};
-
-/**
- * Get Queue URL from queue name
- *
- * AWS requires full URL like: https://sqs.us-east-1.amazonaws.com/123456789/rook-health-webhooks
- * This function converts queue name → full URL
- */
-async function getQueueUrl(queueName: string): Promise<string> {
-  try {
-    const command = new GetQueueUrlCommand({ QueueName: queueName });
-    const response = await sqsClient.send(command);
-    return response.QueueUrl!;
-  } catch (error) {
-    console.error(`❌ Failed to get queue URL for ${queueName}:`, error);
-    throw error;
+function getClient(): ServiceBusClient {
+  if (!connectionString) {
+    throw new Error(
+      "Azure Service Bus not configured. Check AZURE_SERVICE_BUS_CONNECTION_STRING.",
+    );
   }
+  if (!serviceBusClient) {
+    serviceBusClient = new ServiceBusClient(connectionString);
+  }
+  return serviceBusClient;
 }
 
+function getSender(): ServiceBusSender {
+  if (!sender) {
+    sender = getClient().createSender(queueName);
+  }
+  return sender;
+}
+
+// ============================================
+// PRODUCER — Send messages to the queue
+// ============================================
+
 /**
- * SQS Producer - Send message to queue
- *
- * This is called by the webhook controller to enqueue webhooks
+ * Send a message to the Service Bus queue
+ * (Called by the webhook controller when a webhook arrives)
  *
  * @param messageBody - The webhook data to enqueue
- * @returns Message ID from SQS
+ * @returns The message ID
  */
 export async function sendToQueue(messageBody: any): Promise<string> {
   try {
-    const queueUrl = await getQueueUrl(QUEUE_NAMES.HEALTH_WEBHOOKS);
-
-    const command = new SendMessageCommand({
-      QueueUrl: queueUrl,
-      MessageBody: JSON.stringify(messageBody),
-
-      // Message attributes (metadata)
-      MessageAttributes: {
-        provider: {
-          DataType: "String",
-          StringValue: "rook",
-        },
-        data_structure: {
-          DataType: "String",
-          StringValue: messageBody.data_structure || "unknown",
-        },
+    const message: ServiceBusMessage = {
+      body: messageBody,
+      // Application properties = metadata (like SQS MessageAttributes)
+      applicationProperties: {
+        provider: "rook",
+        data_structure: messageBody.data_structure || "unknown",
       },
-    });
+    };
 
-    const response = await sqsClient.send(command);
-    console.log(`✅ Message sent to SQS: ${response.MessageId}`);
+    await getSender().sendMessages(message);
 
-    return response.MessageId!;
+    const messageId = message.messageId || `sb-${Date.now()}`;
+    console.log(`✅ Message sent to Service Bus: ${messageId}`);
+    return String(messageId);
   } catch (error) {
-    console.error("❌ Failed to send message to SQS:", error);
+    console.error("❌ Failed to send message to Service Bus:", error);
     throw error;
   }
 }
 
+// ============================================
+// CONSUMER — Receive messages from the queue
+// ============================================
+
 /**
- * SQS Consumer - Receive messages from queue
+ * Receive messages from the Service Bus queue
+ * (Called by the worker to get new messages to process)
  *
- * This is called by the worker to poll for new messages
- *
- * @param maxMessages - How many messages to fetch (1-10)
- * @param waitTimeSeconds - Long polling duration (0-20 seconds)
- * @returns Array of messages
+ * @param maxMessages - How many messages to fetch
+ * @param waitTimeSeconds - How long to wait for messages
+ * @returns Array of received messages
  */
 export async function receiveFromQueue(
   maxMessages: number = 1,
-  waitTimeSeconds: number = 5, // Long polling - wait up to 5s for messages
-) {
+  waitTimeSeconds: number = 5,
+): Promise<ServiceBusReceivedMessage[]> {
+  // Create a new receiver each time (peekLock mode = message stays until we complete/abandon it)
+  const receiver = getClient().createReceiver(queueName);
+
   try {
-    const queueUrl = await getQueueUrl(QUEUE_NAMES.HEALTH_WEBHOOKS);
-
-    const command = new ReceiveMessageCommand({
-      QueueUrl: queueUrl,
-      MaxNumberOfMessages: maxMessages,
-      WaitTimeSeconds: waitTimeSeconds, // Long polling reduces API calls
-      VisibilityTimeout: 60, // Worker has 60s to process before message reappears
-      MessageAttributeNames: ["All"],
+    const messages = await receiver.receiveMessages(maxMessages, {
+      maxWaitTimeInMs: waitTimeSeconds * 1000,
     });
-
-    const response = await sqsClient.send(command);
-    return response.Messages || [];
+    return messages;
   } catch (error) {
-    console.error("❌ Failed to receive messages from SQS:", error);
+    console.error("❌ Failed to receive messages from Service Bus:", error);
     throw error;
+  } finally {
+    await receiver.close();
   }
 }
 
 /**
- * Delete message from queue after successful processing
+ * Complete (delete) a message after successful processing
  *
- * IMPORTANT: Only delete after processing succeeds!
- * If you delete before processing and worker crashes, message is lost forever.
+ * In Service Bus terminology:
+ * - "complete" = message processed successfully, remove it (like SQS deleteMessage)
+ * - "abandon" = processing failed, put it back in the queue for retry
+ * - "deadLetter" = move to dead-letter queue (permanent failure)
  *
- * @param receiptHandle - Unique handle for this message instance
+ * @param message - The received message to complete
  */
-export async function deleteFromQueue(receiptHandle: string): Promise<void> {
+export async function completeMessage(
+  message: ServiceBusReceivedMessage,
+): Promise<void> {
+  const receiver = getClient().createReceiver(queueName);
   try {
-    const queueUrl = await getQueueUrl(QUEUE_NAMES.HEALTH_WEBHOOKS);
-
-    const command = new DeleteMessageCommand({
-      QueueUrl: queueUrl,
-      ReceiptHandle: receiptHandle,
-    });
-
-    await sqsClient.send(command);
-    console.log("✅ Message deleted from SQS");
+    await receiver.completeMessage(message);
+    console.log("✅ Message completed (deleted) from Service Bus");
   } catch (error) {
-    console.error("❌ Failed to delete message from SQS:", error);
+    console.error("❌ Failed to complete message:", error);
     throw error;
+  } finally {
+    await receiver.close();
   }
 }
 
 /**
- * Health check - Verify SQS connection
+ * Abandon a message (put it back in the queue for retry)
+ *
+ * @param message - The received message to abandon
+ */
+export async function abandonMessage(
+  message: ServiceBusReceivedMessage,
+): Promise<void> {
+  const receiver = getClient().createReceiver(queueName);
+  try {
+    await receiver.abandonMessage(message);
+    console.log("🔄 Message abandoned (will retry) in Service Bus");
+  } catch (error) {
+    console.error("❌ Failed to abandon message:", error);
+    throw error;
+  } finally {
+    await receiver.close();
+  }
+}
+
+/**
+ * Send a message to dead-letter queue (permanent failure)
+ *
+ * @param message - The received message to dead-letter
+ * @param reason - Why the message is being dead-lettered
+ */
+export async function deadLetterMessage(
+  message: ServiceBusReceivedMessage,
+  reason: string,
+): Promise<void> {
+  const receiver = getClient().createReceiver(queueName);
+  try {
+    await receiver.deadLetterMessage(message, {
+      deadLetterReason: reason,
+      deadLetterErrorDescription: `Permanent failure: ${reason}`,
+    });
+    console.log("💀 Message sent to dead-letter queue:", reason);
+  } catch (error) {
+    console.error("❌ Failed to dead-letter message:", error);
+    throw error;
+  } finally {
+    await receiver.close();
+  }
+}
+
+// ============================================
+// HEALTH CHECK
+// ============================================
+
+/**
+ * Verify Service Bus connection is working
  */
 export async function healthCheck(): Promise<boolean> {
   try {
-    await getQueueUrl(QUEUE_NAMES.HEALTH_WEBHOOKS);
+    // Try to create a receiver — if connection string is wrong, this will fail
+    const receiver = getClient().createReceiver(queueName);
+    await receiver.close();
     return true;
   } catch (error) {
     return false;
   }
 }
 
-export { sqsClient, QUEUE_NAMES };
+/**
+ * Close the Service Bus connection (for graceful shutdown)
+ */
+export async function closeServiceBus(): Promise<void> {
+  try {
+    if (sender) {
+      await sender.close();
+      sender = null;
+    }
+    if (serviceBusClient) {
+      await serviceBusClient.close();
+      serviceBusClient = null;
+    }
+    console.log("✅ Service Bus connection closed");
+  } catch (error) {
+    console.error("❌ Error closing Service Bus:", error);
+  }
+}
+
+export { queueName };

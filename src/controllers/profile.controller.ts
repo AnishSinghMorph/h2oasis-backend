@@ -1,45 +1,7 @@
 import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 import { User } from "../models/User.model";
-import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
-
-// ============================================
-// S3 CLIENT & HELPERS
-// ============================================
-const s3Client = new S3Client({
-  region: process.env.AWS_REGION || "us-east-1",
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
-});
-
-const deleteFromS3 = async (photoURL: string): Promise<void> => {
-  try {
-    const urlParts = photoURL.includes("cloudfront.net")
-      ? photoURL.split(".net/")
-      : photoURL.split(".com/");
-    if (urlParts.length < 2) return;
-
-    await s3Client.send(
-      new DeleteObjectCommand({
-        Bucket: process.env.AWS_S3_BUCKET_NAME!,
-        Key: urlParts[1],
-      }),
-    );
-    console.log("✅ Deleted old file from S3:", urlParts[1]);
-  } catch (error) {
-    console.error("⚠️ Error deleting from S3:", error);
-  }
-};
-
-const convertToCloudFrontURL = (s3URL: string): string => {
-  const cloudFrontURL = process.env.CLOUDFRONT_URL;
-  if (!cloudFrontURL) return s3URL;
-
-  const urlParts = s3URL.split(".com/");
-  return urlParts.length < 2 ? s3URL : `${cloudFrontURL}/${urlParts[1]}`;
-};
+import { uploadToAzureBlob, deleteFromAzureBlob } from "../utils/blobStorage";
 
 // ============================================
 // HELPER FUNCTIONS
@@ -61,28 +23,45 @@ const sendSuccess = (
 // ============================================
 export class ProfileController {
   /**
-   * Upload profile picture to S3 and update user
+   * Upload profile picture to Azure Blob Storage and update user
+   *
+   * FLOW:
+   * 1. multer receives file into memory (configured in blobStorage.ts)
+   * 2. We upload that buffer to Azure Blob Storage
+   * 3. Save the blob URL to the user's MongoDB document
+   * 4. Delete old photo if one existed
    */
   static uploadProfilePicture = async (
     req: AuthenticatedRequest,
     res: Response,
   ): Promise<void> => {
     try {
-      const file = req.file as Express.MulterS3.File;
-      if (!file) {
+      const file = req.file;
+      if (!file || !file.buffer) {
         sendError(res, 400, "No file uploaded");
         return;
       }
 
       const userId = req.user!.uid;
-      const photoURL = convertToCloudFrontURL(file.location);
 
-      // Delete old photo if exists, then update
+      // Build the blob path (same structure as before with S3)
+      const fileExtension = file.originalname.split(".").pop();
+      const blobName = `profile-pictures/${userId}-${Date.now()}.${fileExtension}`;
+
+      // Upload to Azure Blob Storage
+      const photoURL = await uploadToAzureBlob(
+        file.buffer,
+        blobName,
+        file.mimetype,
+      );
+
+      // Delete old photo if exists
       const existingUser = await User.findOne({ firebaseUid: userId });
       if (existingUser?.photoURL) {
-        await deleteFromS3(existingUser.photoURL);
+        await deleteFromAzureBlob(existingUser.photoURL);
       }
 
+      // Update user with new photo URL
       const user = await User.findOneAndUpdate(
         { firebaseUid: userId },
         { photoURL },
@@ -102,7 +81,7 @@ export class ProfileController {
   };
 
   /**
-   * Delete profile picture from S3 and user profile
+   * Delete profile picture from Azure Blob Storage and user profile
    */
   static deleteProfilePicture = async (
     req: AuthenticatedRequest,
@@ -118,7 +97,7 @@ export class ProfileController {
       }
 
       if (existingUser.photoURL) {
-        await deleteFromS3(existingUser.photoURL);
+        await deleteFromAzureBlob(existingUser.photoURL);
       }
 
       await User.findOneAndUpdate(
