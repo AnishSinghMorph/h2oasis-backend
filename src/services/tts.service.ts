@@ -1,6 +1,7 @@
 import fetch from "node-fetch";
 import fs from "fs";
 import path from "path";
+import os from "os";
 
 interface TTSOptions {
   text: string;
@@ -58,8 +59,8 @@ export class TTSService {
   private audioDirectory: string;
 
   private constructor() {
-    // Create audio directory if it doesn't exist
-    this.audioDirectory = path.join(process.cwd(), "uploads", "audio");
+    // Create audio directory in the system temp directory since Azure package is read-only
+    this.audioDirectory = path.join(os.tmpdir(), "h2oasis-audio");
     if (!fs.existsSync(this.audioDirectory)) {
       fs.mkdirSync(this.audioDirectory, { recursive: true });
     }
