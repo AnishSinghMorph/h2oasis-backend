@@ -1,7 +1,7 @@
 # Azure Web Apps Deploy — Node.js
 # Docs: https://github.com/Azure/webapps-deploy
 
-name: Build and deploy Node.js app to Azure Web App - app-wat-h2o-eus-dev-001
+name: Deploy to Azure
 
 on:
   push:
