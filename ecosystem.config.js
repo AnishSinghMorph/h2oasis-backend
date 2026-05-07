@@ -2,8 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'h2oasis-api',
-      script: 'npm',
-      args: 'start',
+      script: 'lib/server.js',
       instances: 1,
       autorestart: true,
       watch: false,
@@ -11,14 +10,11 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
       },
-      error_file: './logs/api-error.log',
-      out_file: './logs/api-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
     },
     {
       name: 'webhook-worker',
-      script: 'npm',
-      args: 'run worker',
+      script: 'lib/src/workers/webhook-consumer.worker.js',
       instances: 1,
       autorestart: true,
       watch: false,
@@ -26,8 +22,6 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
       },
-      error_file: './logs/worker-error.log',
-      out_file: './logs/worker-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
     },
   ],

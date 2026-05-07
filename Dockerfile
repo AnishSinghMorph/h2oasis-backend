@@ -6,14 +6,17 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (use install instead of ci to handle lock file issues)
-RUN npm install --production
+# Install ALL dependencies (including devDependencies for TypeScript)
+RUN npm install
 
 # Copy source code
 COPY . .
 
 # Build the application
 RUN npm run build
+
+# Prune dev dependencies so we only copy production ones to the final image
+RUN npm prune --production
 
 # Production stage
 FROM node:20-alpine AS production
@@ -29,8 +32,17 @@ COPY --from=builder --chown=nextjs:nodejs /app/lib ./lib
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/package*.json ./
 
-# Create uploads directory and set ownership
-RUN mkdir -p /app/uploads && chown -R nextjs:nodejs /app/uploads
+# Copy ecosystem config for PM2
+COPY --from=builder --chown=nextjs:nodejs /app/ecosystem.config.js ./
+
+# Install PM2 globally
+RUN npm install -g pm2
+
+# Create uploads and PM2 directories and set ownership
+RUN mkdir -p /app/uploads /app/.pm2 && chown -R nextjs:nodejs /app/uploads /app/.pm2
+
+# Set PM2 Home directory so it doesn't try to write to root
+ENV PM2_HOME=/app/.pm2
 
 # Switch to non-root user
 USER nextjs
@@ -42,5 +54,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
-# Start the application directly (skip clean/build since we already built)
-CMD ["node", "lib/server.js"]
+# Start BOTH the API and the Worker using PM2
+CMD ["pm2-runtime", "ecosystem.config.js"]
