@@ -226,7 +226,14 @@ async function startWorker(): Promise<void> {
 
       // Small delay before next poll
       await new Promise((resolve) => setTimeout(resolve, POLLING_INTERVAL));
-    } catch (error) {
+    } catch (error: any) {
+      // If the queue doesn't exist yet, log a warning and wait longer instead of crash-looping
+      if (error?.code === "MessagingEntityNotFound") {
+        console.warn("⚠️ Service Bus queue 'task-queue' not found. Will retry in 60s. Create the queue in Azure Portal to fix this.");
+        await new Promise((resolve) => setTimeout(resolve, 60000));
+        continue;
+      }
+
       console.error("❌ Worker error:", error);
 
       // Report to Sentry
