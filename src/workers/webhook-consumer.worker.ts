@@ -43,7 +43,7 @@ import * as Sentry from "@sentry/node";
 // Worker configuration
 const POLLING_INTERVAL = 1000; // 1 second between polls
 const MAX_MESSAGES = 1; // Process 1 message at a time
-const WAIT_TIME_SECONDS = 5; // Long polling timeout
+const WAIT_TIME_SECONDS = 1; // Long polling timeout
 
 // Graceful shutdown flag
 let isShuttingDown = false;
