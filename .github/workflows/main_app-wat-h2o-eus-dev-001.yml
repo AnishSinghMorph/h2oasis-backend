@@ -26,12 +26,17 @@ jobs:
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+        env:
+          NPM_CONFIG_AUDIT: 'false'
 
       - name: Build TypeScript
         run: npm run build
 
       - name: Prune dev dependencies
         run: npm prune --production --no-audit --no-fund
+
+      - name: Disable audit for Azure Oryx build engine
+        run: echo "audit=false" >> .npmrc
 
       - name: Create deployment artifact
         run: |
