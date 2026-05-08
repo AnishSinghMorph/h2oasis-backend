@@ -32,12 +32,12 @@ const options: swaggerJsdoc.Options = {
     ],
     servers: [
       {
-        url: "https://api.h2oasis.ai",
-        description: "Development server",
+        url: "https://app-wat-h2o-eus-dev-001.azurewebsites.net",
+        description: "Azure Development Server",
       },
       {
-        url: "https://api.h2oasis.ai",
-        description: "Production server",
+        url: "http://localhost:3000",
+        description: "Local Development Server",
       },
     ],
     components: {
