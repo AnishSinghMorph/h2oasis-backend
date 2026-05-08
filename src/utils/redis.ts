@@ -4,8 +4,8 @@ const isRedisDisabled = !process.env.REDIS_URL || process.env.DISABLE_REDIS === 
 
 // If redis is disabled, return a mock client that resolves seamlessly without crashing
 const mockRedisClient = {
-  on: () => {},
-  connect: async () => {},
+  on: () => { },
+  connect: async () => { },
   ping: async () => true,
   get: async () => null,
   set: async () => "OK",
