@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 import { User } from "../models/User.model";
-import { uploadToAzureBlob, deleteFromAzureBlob } from "../utils/blobStorage";
+import { uploadToAzureBlob, deleteFromAzureBlob, getBlobSasUrl } from "../utils/blobStorage";
 
 // ============================================
 // HELPER FUNCTIONS
@@ -73,7 +73,10 @@ export class ProfileController {
         return;
       }
 
-      sendSuccess(res, "Profile picture uploaded successfully", { photoURL });
+      // Generate a SAS URL to send back to the client so it can render the newly uploaded private image
+      const sasPhotoURL = await getBlobSasUrl(photoURL);
+
+      sendSuccess(res, "Profile picture uploaded successfully", { photoURL: sasPhotoURL });
     } catch (error) {
       console.error("Error uploading profile picture:", error);
       sendError(res, 500, "Failed to upload profile picture");

@@ -17,6 +17,7 @@ import multer from "multer";
 import {
   BlobServiceClient,
   StorageSharedKeyCredential,
+  BlobSASPermissions,
 } from "@azure/storage-blob";
 
 // ============================================
@@ -108,6 +109,41 @@ export async function deleteFromAzureBlob(blobUrl: string): Promise<void> {
     console.log("✅ Deleted from Azure Blob:", blobName);
   } catch (error) {
     console.error("⚠️ Error deleting from Azure Blob:", error);
+  }
+}
+
+/**
+ * Generate a Shared Access Signature (SAS) URL for a given blob URL
+ * This allows the client to view a private blob temporarily.
+ *
+ * @param blobUrl - The plain URL of the blob (without SAS token)
+ * @returns The SAS URL valid for 24 hours, or the original URL if generation fails
+ */
+export async function getBlobSasUrl(blobUrl: string): Promise<string> {
+  if (!containerClient || !blobUrl) return blobUrl;
+  
+  // If the URL already has a SAS token, return it
+  if (blobUrl.includes("?sv=")) return blobUrl;
+
+  try {
+    const url = new URL(blobUrl);
+    const pathParts = url.pathname.split("/");
+    const blobName = pathParts.slice(2).join("/");
+
+    if (!blobName) return blobUrl;
+
+    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+    
+    // Generate SAS URL valid for 24 hours
+    const sasUrl = await blockBlobClient.generateSasUrl({
+      permissions: BlobSASPermissions.parse("r"),
+      expiresOn: new Date(new Date().valueOf() + 24 * 60 * 60 * 1000), // 24 hours from now
+    });
+    
+    return sasUrl;
+  } catch (error) {
+    console.error("⚠️ Error generating SAS token for blob:", error);
+    return blobUrl; // Fallback to original
   }
 }
 

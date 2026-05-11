@@ -7,6 +7,7 @@ import { admin } from "../utils/firebase";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 import redis from "../utils/redis";
 import { generateOTP, sendOTPEmail } from "../services/otp.service";
+import { getBlobSasUrl } from "../utils/blobStorage";
 
 // -----------------------------
 // ZOD SCHEMAS
@@ -246,6 +247,8 @@ export class AuthController {
           .status(404)
           .json({ success: false, message: "User not found" });
 
+      const photoURLWithSas = user.photoURL ? await getBlobSasUrl(user.photoURL) : undefined;
+
       return res.status(200).json({
         success: true,
         user: {
@@ -253,7 +256,7 @@ export class AuthController {
           email: user.email,
           fullName: user.fullName,
           displayName: user.displayName,
-          photoURL: user.photoURL,
+          photoURL: photoURLWithSas,
           isEmailVerified: user.isEmailVerified,
           onboardingCompleted: user.onboardingCompleted,
           linkedProviders: Array.from(user.linkedProviders?.keys() || []),
