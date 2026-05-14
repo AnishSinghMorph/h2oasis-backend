@@ -41,7 +41,8 @@ export const initSentry = () => {
         delete env.ROOK_SECRET_HASH_KEY;
         delete env.OPENAI_API_KEY;
         delete env.ELEVENLABS_API_KEY;
-        delete env.AWS_SECRET_ACCESS_KEY;
+        delete env.AZURE_COMMUNICATION_CONNECTION_STRING;
+        delete env.AZURE_COMMUNICATION_ACCESS_KEY;
       }
 
       return event;

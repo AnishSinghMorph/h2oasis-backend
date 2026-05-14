@@ -6,6 +6,13 @@ import upload from "../utils/blobStorage";
 
 const router = Router();
 
+// Update profile fields (fullName, dateOfBirth, gender)
+router.patch(
+  "/update",
+  verifyFirebaseToken,
+  asyncHandler(ProfileController.updateProfile),
+);
+
 // Upload profile picture
 router.post(
   "/upload-picture",

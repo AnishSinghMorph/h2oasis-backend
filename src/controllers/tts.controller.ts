@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { ttsService, PERSONA_VOICES } from "../services/tts.service";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
+import { paramString } from "../utils/routeParams";
 import path from "path";
 import fs from "fs";
 
@@ -113,7 +114,7 @@ export class TTSController {
    */
   static async serveAudio(req: Request, res: Response): Promise<void> {
     try {
-      const { fileName } = req.params;
+      const fileName = paramString(req.params.fileName);
 
       // Validate filename (security)
       if (!fileName || !/^tts_\d+_[a-z0-9]+\.mp3$/.test(fileName)) {
@@ -157,7 +158,15 @@ export class TTSController {
    */
   static async previewVoice(req: Request, res: Response): Promise<void> {
     try {
-      const { voiceKey } = req.params;
+      const voiceKey = paramString(req.params.voiceKey);
+
+      if (!voiceKey) {
+        res.status(400).json({
+          success: false,
+          error: "Voice key is required",
+        });
+        return;
+      }
 
       const voice = ttsService.getVoiceById(voiceKey);
       if (!voice) {

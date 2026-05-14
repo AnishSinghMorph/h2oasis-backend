@@ -1,0 +1,7 @@
+/** Express param values may be typed as string | string[]; named route segments are a single string at runtime. */
+export function paramString(
+  value: string | string[] | undefined,
+): string | undefined {
+  if (value === undefined) return undefined;
+  return Array.isArray(value) ? value[0] : value;
+}

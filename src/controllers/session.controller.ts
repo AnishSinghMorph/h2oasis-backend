@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { SessionService } from "../services/session.service";
 import { ISessionStep } from "../models/Session.model";
+import { paramString } from "../utils/routeParams";
 
 export class SessionController {
   private sessionService: SessionService;
@@ -127,12 +128,20 @@ export class SessionController {
   getSessionById = async (req: Request, res: Response): Promise<void> => {
     try {
       const firebaseUid = req.headers["x-firebase-uid"] as string;
-      const { sessionId } = req.params;
+      const sessionId = paramString(req.params.sessionId);
 
       if (!firebaseUid) {
         res.status(401).json({
           success: false,
           error: "Authentication required",
+        });
+        return;
+      }
+
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: "Session ID is required",
         });
         return;
       }
@@ -170,12 +179,20 @@ export class SessionController {
   updateSession = async (req: Request, res: Response): Promise<void> => {
     try {
       const firebaseUid = req.headers["x-firebase-uid"] as string;
-      const { sessionId } = req.params;
+      const sessionId = paramString(req.params.sessionId);
 
       if (!firebaseUid) {
         res.status(401).json({
           success: false,
           error: "Authentication required",
+        });
+        return;
+      }
+
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: "Session ID is required",
         });
         return;
       }
@@ -241,12 +258,20 @@ export class SessionController {
   deleteSession = async (req: Request, res: Response): Promise<void> => {
     try {
       const firebaseUid = req.headers["x-firebase-uid"] as string;
-      const { sessionId } = req.params;
+      const sessionId = paramString(req.params.sessionId);
 
       if (!firebaseUid) {
         res.status(401).json({
           success: false,
           error: "Authentication required",
+        });
+        return;
+      }
+
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: "Session ID is required",
         });
         return;
       }
