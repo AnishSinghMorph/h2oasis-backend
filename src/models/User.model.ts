@@ -18,6 +18,8 @@ export interface IUser extends Document {
   fullName?: string;
   phone?: string;
   displayName?: string;
+  dateOfBirth?: Date;
+  gender?: string;
   provider: string;
   linkedProviders?: Map<string, string>;
   isEmailVerified: boolean;
@@ -83,6 +85,17 @@ const UserSchema = new Schema<IUser>(
       type: String,
       trim: true,
       maxlength: [50, "Display name cannot exceed 50 characters"],
+    },
+    dateOfBirth: {
+      type: Date,
+    },
+    gender: {
+      type: String,
+      trim: true,
+      enum: {
+        values: ["Male", "Female", "Non-binary", "Prefer not to say", "Other"],
+        message: "Invalid gender value",
+      },
     },
     photoURL: {
       type: String,

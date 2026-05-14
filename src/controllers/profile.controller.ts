@@ -84,6 +84,80 @@ export class ProfileController {
   };
 
   /**
+   * Update editable profile fields: fullName, dateOfBirth, gender
+   */
+  static updateProfile = async (
+    req: AuthenticatedRequest,
+    res: Response,
+  ): Promise<void> => {
+    try {
+      const userId = req.user!.uid;
+      const { fullName, dateOfBirth, gender } = req.body;
+
+      const updates: Record<string, any> = {};
+
+      if (fullName !== undefined) {
+        const trimmed = String(fullName).trim();
+        if (trimmed.length === 0) {
+          sendError(res, 400, "Full name cannot be empty");
+          return;
+        }
+        if (trimmed.length > 60) {
+          sendError(res, 400, "Full name cannot exceed 60 characters");
+          return;
+        }
+        updates.fullName = trimmed;
+        updates.displayName = trimmed; // keep both fields in sync
+      }
+
+      if (dateOfBirth !== undefined && dateOfBirth !== "") {
+        const parsed = new Date(dateOfBirth);
+        if (isNaN(parsed.getTime())) {
+          sendError(res, 400, "Invalid date of birth");
+          return;
+        }
+        updates.dateOfBirth = parsed;
+      }
+
+      if (gender !== undefined && gender !== "") {
+        const allowed = ["Male", "Female", "Non-binary", "Prefer not to say", "Other"];
+        if (!allowed.includes(gender)) {
+          sendError(res, 400, "Invalid gender value");
+          return;
+        }
+        updates.gender = gender;
+      }
+
+      if (Object.keys(updates).length === 0) {
+        sendError(res, 400, "No valid fields provided to update");
+        return;
+      }
+
+      const user = await User.findOneAndUpdate(
+        { firebaseUid: userId },
+        { $set: updates },
+        { new: true, runValidators: true },
+      );
+
+      if (!user) {
+        sendError(res, 404, "User not found");
+        return;
+      }
+
+      sendSuccess(res, "Profile updated successfully", {
+        user: {
+          fullName: user.fullName,
+          dateOfBirth: user.dateOfBirth,
+          gender: user.gender,
+        },
+      });
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      sendError(res, 500, "Failed to update profile");
+    }
+  };
+
+  /**
    * Delete profile picture from Azure Blob Storage and user profile
    */
   static deleteProfilePicture = async (

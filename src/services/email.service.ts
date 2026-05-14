@@ -1,12 +1,5 @@
-import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
-
-const sesClient = new SESClient({
-  region: process.env.AWS_REGION || "us-east-1",
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
-});
+import { EmailClient } from "@azure/communication-email";
+import { AzureKeyCredential } from "@azure/core-auth";
 
 interface SendEmailParams {
   to: string;
@@ -14,30 +7,49 @@ interface SendEmailParams {
   html: string;
 }
 
+const getAzureEmailClient = (): EmailClient => {
+  const connectionString = process.env.AZURE_COMMUNICATION_CONNECTION_STRING;
+  if (connectionString) {
+    return new EmailClient(connectionString);
+  }
+
+  const endpoint = process.env.AZURE_COMMUNICATION_SERVICE_ENDPOINT;
+  const accessKey = process.env.AZURE_COMMUNICATION_ACCESS_KEY;
+
+  if (!endpoint || !accessKey) {
+    throw new Error(
+      "Azure email is not configured. Set AZURE_COMMUNICATION_CONNECTION_STRING or both AZURE_COMMUNICATION_SERVICE_ENDPOINT and AZURE_COMMUNICATION_ACCESS_KEY.",
+    );
+  }
+
+  return new EmailClient(endpoint, new AzureKeyCredential(accessKey));
+};
+
 export const sendEmail = async ({
   to,
   subject,
   html,
 }: SendEmailParams): Promise<void> => {
-  const command = new SendEmailCommand({
-    Source: process.env.SES_FROM_EMAIL || "anish@getmorph.com",
-    Destination: {
-      ToAddresses: [to],
-    },
-    Message: {
-      Subject: {
-        Data: subject,
-      },
-      Body: {
-        Html: {
-          Data: html,
-        },
-      },
-    },
-  });
+  const senderAddress = process.env.AZURE_EMAIL_FROM;
+  if (!senderAddress) {
+    throw new Error("AZURE_EMAIL_FROM environment variable is not set.");
+  }
+
+  const emailClient = getAzureEmailClient();
 
   try {
-    await sesClient.send(command);
+    const poller = await emailClient.beginSend({
+      senderAddress,
+      content: {
+        subject,
+        html,
+      },
+      recipients: {
+        to: [{ address: to }],
+      },
+    });
+
+    await poller.pollUntilDone();
     console.log(`✅ Email sent to ${to}`);
   } catch (error) {
     console.error("❌ Error sending email:", error);
